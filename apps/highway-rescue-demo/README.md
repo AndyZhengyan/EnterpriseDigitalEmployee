@@ -34,6 +34,11 @@ python3 server.py
 本仓库已提供自动部署工作流：
 - `.github/workflows/deploy-highway-demo-pages.yml`
 
+工作流行为：
+- `pull_request`：仅执行构建与 Pages artifact 上传校验（不实际发布）
+- `push` 到 `main/master/work`：自动发布到 GitHub Pages
+- `workflow_dispatch`：可手动触发发布
+
 启用方式：
 1. 在 GitHub 仓库 Settings -> Pages 中将 Source 设为 **GitHub Actions**。
 2. 合并包含该工作流的分支。
