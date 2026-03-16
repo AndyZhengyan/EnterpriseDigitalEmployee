@@ -8,8 +8,9 @@
 - **Cyber HUD 视觉层**：以 Gotham 风格为参考，构建偏游戏化的作战大屏
 ## 页面入口（GitHub Pages）
 - `index.html`：站点导航页（统一入口）
-- `admin-config.html`：管理配置页面（管理端示意）
-- `highway-demo.html`：高速事故救援 Demo 页面
+- `adminconsole/index.html`：AdminConsole 管理页面
+- `demo/index.html`：高速事故救援 Demo 页面
+- 兼容入口：`admin-config.html` 与 `highway-demo.html` 会自动重定向到新目录
 
 ## 功能
 - Mock 事故事件触发
@@ -27,8 +28,9 @@ python3 server.py
 ```
 
 浏览器访问：
-- http://localhost:8000/index.html（导航页）
-- http://localhost:8000/highway-demo.html（高速事故 Demo）
+- http://localhost:8000/（导航页）
+- http://localhost:8000/demo/（高速事故 Demo）
+- http://localhost:8000/adminconsole/（AdminConsole）
 
 ## GitHub Pages 部署
 本仓库已提供自动部署工作流：

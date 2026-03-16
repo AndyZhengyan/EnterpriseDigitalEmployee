@@ -142,9 +142,27 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/health":
             self._json({"ok": True, "ts": time.time()})
             return
-        if parsed.path == "/":
-            self._serve_file(Path(__file__).parent / "static" / "index.html")
+
+        static_root = Path(__file__).parent / "static"
+        request_path = parsed.path or "/"
+        if request_path == "/":
+            target = static_root / "index.html"
+        else:
+            relative = request_path.lstrip("/")
+            target = static_root / relative
+            if request_path.endswith("/"):
+                target = target / "index.html"
+
+        if target.exists() and target.is_file() and static_root in target.parents:
+            suffix_map = {
+                ".html": "text/html; charset=utf-8",
+                ".css": "text/css; charset=utf-8",
+                ".js": "text/javascript; charset=utf-8",
+                ".json": "application/json; charset=utf-8",
+            }
+            self._serve_file(target, suffix_map.get(target.suffix, "text/plain; charset=utf-8"))
             return
+
         self.send_error(404)
 
     def do_POST(self):

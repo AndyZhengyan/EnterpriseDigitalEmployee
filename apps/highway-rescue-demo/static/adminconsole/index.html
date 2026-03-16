@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AdminConsole | 企业数字员工</title>
+    <style>
+      :root {
+        --bg: #07111d;
+        --panel: rgba(8, 21, 36, 0.78);
+        --line: rgba(92, 222, 255, 0.42);
+        --cyan: #56f0ff;
+        --green: #45ffa3;
+        --warn: #ffcc66;
+        --danger: #ff5a7a;
+        --text: #d8ecff;
+        --muted: #9ab7d0;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", "PingFang SC", sans-serif;
+        color: var(--text);
+        background: radial-gradient(circle at 30% 0, #163d63 0%, var(--bg) 38%, #030a14 100%);
+      }
+      .hud {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 2px, transparent 4px);
+        opacity: 0.2;
+        z-index: 1;
+      }
+      #app { position: relative; z-index: 2; }
+      header {
+        height: 72px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(4, 14, 26, 0.76);
+        backdrop-filter: blur(6px);
+      }
+      .title { font-size: 18px; font-weight: 700; letter-spacing: .08em; }
+      .subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
+      .link {
+        color: var(--cyan);
+        text-decoration: none;
+        border: 1px solid rgba(130, 221, 255, 0.5);
+        border-radius: 8px;
+        padding: 8px 12px;
+      }
+      .layout {
+        min-height: calc(100vh - 72px);
+        display: grid;
+        grid-template-columns: 1.25fr 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        box-shadow: inset 0 0 30px rgba(23, 93, 140, 0.22), 0 8px 30px rgba(2, 6, 12, 0.4);
+      }
+      .section { padding: 14px; }
+      h3 { margin: 0 0 10px; font-size: 14px; letter-spacing: .08em; color: var(--cyan); }
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .kpi {
+        background: rgba(7, 32, 54, 0.78);
+        border: 1px solid rgba(97, 185, 255, 0.35);
+        border-radius: 8px;
+        padding: 8px;
+      }
+      .kpi .label { font-size: 11px; color: var(--muted); }
+      .kpi .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th, td { text-align: left; padding: 8px; border-bottom: 1px solid rgba(112, 194, 255, 0.2); }
+      th { color: var(--muted); font-weight: 600; }
+      .tag { padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+      .ok { background: rgba(69, 255, 163, .15); color: var(--green); }
+      .warn { background: rgba(255, 204, 102, .15); color: var(--warn); }
+      .danger { background: rgba(255, 90, 122, .15); color: var(--danger); }
+      .log-item {
+        border-left: 2px solid rgba(95, 221, 255, 0.55);
+        background: rgba(7, 29, 47, 0.68);
+        margin-bottom: 8px;
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <div>
+          <div class="title">企业数字员工管理中台 / AdminConsole</div>
+          <div class="subtitle">Vue ESM architecture aligned with Demo page</div>
+        </div>
+        <a class="link" href="../index.html">返回导航页</a>
+      </header>
+
+      <main class="layout">
+        <section class="card section">
+          <h3>系统配置总览</h3>
+          <div class="kpi-grid">
+            <div class="kpi" v-for="item in kpis" :key="item.label">
+              <div class="label">{{ item.label }}</div>
+              <div class="value">{{ item.value }}</div>
+            </div>
+          </div>
+
+          <h3 style="margin-top:14px">模块运行状态</h3>
+          <table>
+            <thead>
+              <tr><th>模块</th><th>说明</th><th>状态</th><th>负责人</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="module in modules" :key="module.name">
+                <td>{{ module.name }}</td>
+                <td>{{ module.desc }}</td>
+                <td><span class="tag" :class="module.level">{{ module.status }}</span></td>
+                <td>{{ module.owner }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="card section">
+          <h3>配置变更日志</h3>
+          <div class="log-item" v-for="log in logs" :key="log.ts + log.message">
+            [{{ formatTime(log.ts) }}] {{ log.message }}
+          </div>
+        </section>
+      </main>
+    </div>
+    <div class="hud"></div>
+
+    <script type="module">
+      import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
+
+      createApp({
+        data() {
+          return {
+            kpis: [
+              { label: '接入数字员工', value: '12' },
+              { label: '运行中任务', value: '37' },
+              { label: '告警数（24h）', value: '3' },
+              { label: '平均响应时间', value: '1.8s' },
+            ],
+            modules: [
+              { name: '员工中心', desc: '员工档案、技能绑定、权限分组', status: '正常', level: 'ok', owner: '平台运营组' },
+              { name: '任务中心', desc: '任务编排、SLA、消息通知', status: '正常', level: 'ok', owner: '流程产品组' },
+              { name: '场景编排', desc: '业务场景流、规则引擎、审批链路', status: '待升级', level: 'warn', owner: '架构治理组' },
+              { name: '运行告警', desc: '健康检查、故障告警、值班路由', status: '异常波动', level: 'danger', owner: 'SRE 团队' },
+            ],
+            logs: [
+              { ts: Date.now() / 1000 - 3600, message: '完成员工中心权限策略同步。' },
+              { ts: Date.now() / 1000 - 1500, message: '任务中心新增高速救援场景模板。' },
+              { ts: Date.now() / 1000 - 500, message: '运行告警模块触发阈值波动告警。' },
+            ]
+          };
+        },
+        methods: {
+          formatTime(ts) {
+            return new Date(ts * 1000).toLocaleTimeString();
+          }
+        }
+      }).mount('#app');
+    </script>
+  </body>
+</html>
