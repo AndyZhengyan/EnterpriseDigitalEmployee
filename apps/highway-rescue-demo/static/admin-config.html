@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>管理配置页面 | 企业数字员工</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: #f5f7fd;
+        color: #22304f;
+      }
+      header {
+        background: linear-gradient(120deg, #1e4fbf, #3f73ee);
+        color: #fff;
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .back {
+        color: #fff;
+        text-decoration: none;
+        border: 1px solid rgba(255,255,255,.45);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 14px;
+      }
+      .container {
+        max-width: 1080px;
+        margin: 24px auto;
+        padding: 0 18px 28px;
+      }
+      .kpis {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .kpi {
+        background: #fff;
+        border-radius: 12px;
+        padding: 14px;
+        border: 1px solid #e4ebfa;
+      }
+      .kpi .label { color: #66759a; font-size: 13px; }
+      .kpi .value { font-size: 28px; font-weight: 700; margin-top: 8px; }
+      .panel {
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e4ebfa;
+        margin-bottom: 12px;
+        padding: 16px;
+      }
+      .panel h3 { margin-top: 0; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #eef2fb; font-size: 14px; }
+      th { color: #5d6f96; font-weight: 600; }
+      .status { font-weight: 600; }
+      .status.ok { color: #0f8a42; }
+      .status.warn { color: #c77a00; }
+      .btn {
+        background: #2f5de0;
+        color: #fff;
+        border: 0;
+        border-radius: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>企业数字员工 · 管理配置页面</strong>
+      </div>
+      <a class="back" href="./index.html">返回导航页</a>
+    </header>
+
+    <main class="container">
+      <section class="kpis">
+        <div class="kpi"><div class="label">已接入数字员工</div><div class="value">12</div></div>
+        <div class="kpi"><div class="label">运行中任务</div><div class="value">37</div></div>
+        <div class="kpi"><div class="label">告警数（24h）</div><div class="value">3</div></div>
+        <div class="kpi"><div class="label">平均响应时间</div><div class="value">1.8s</div></div>
+      </section>
+
+      <section class="panel">
+        <h3>模块配置总览</h3>
+        <table>
+          <thead>
+            <tr><th>模块</th><th>说明</th><th>状态</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>员工中心</td><td>员工档案、技能绑定、权限分组</td><td class="status ok">正常</td><td><button class="btn">进入配置</button></td></tr>
+            <tr><td>任务中心</td><td>任务编排、SLA、消息通知</td><td class="status ok">正常</td><td><button class="btn">进入配置</button></td></tr>
+            <tr><td>场景编排</td><td>业务场景流、规则引擎、审批链路</td><td class="status warn">待升级</td><td><button class="btn">查看方案</button></td></tr>
+            <tr><td>运行告警</td><td>健康检查、故障告警、值班路由</td><td class="status ok">正常</td><td><button class="btn">进入配置</button></td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h3>说明</h3>
+        <p>此页面用于与「高速事故救援 Demo」分离部署，作为 GitHub Pages 上独立访问的管理端入口示意页。</p>
+      </section>
+    </main>
+  </body>
+</html>
