@@ -19,3 +19,7 @@
 
 ## 部署
 - `apps/highway-rescue-demo/` 已支持 GitHub Pages 自动部署（见 `.github/workflows/deploy-highway-demo-pages.yml`）
+
+
+## 核心 MVP 运行入口
+- `apps/mvp-core/`：核心 Agent + 核心控制台 + 高速事故处理场景 Demo（一体化可运行）

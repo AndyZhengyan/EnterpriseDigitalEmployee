@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>数字员工控制台 MVP</title>
+  <style>
+    body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb}
+    header{background:#1f3f72;color:#fff;padding:12px 16px}
+    .wrap{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .card{background:#fff;border-radius:8px;padding:12px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border-bottom:1px solid #eee;padding:6px;text-align:left}
+    button{background:#1f3f72;color:#fff;border:0;border-radius:6px;padding:8px 10px;cursor:pointer}
+    .muted{color:#666;font-size:12px}
+  </style>
+</head>
+<body>
+<header>
+  核心控制台 MVP（数字员工 / 任务 / 告警）
+</header>
+<div class="wrap">
+  <div class="card">
+    <h3>数字员工</h3>
+    <div id="employees"></div>
+  </div>
+  <div class="card">
+    <h3>操作</h3>
+    <button onclick="createTask()">创建高速事故处置任务</button>
+    <span class="muted">（将由核心 Agent 自动执行）</span>
+    <p><a href="/scenario">查看场景地图 Demo</a></p>
+  </div>
+  <div class="card">
+    <h3>任务列表</h3>
+    <div id="tasks"></div>
+  </div>
+  <div class="card">
+    <h3>告警</h3>
+    <div id="alerts"></div>
+  </div>
+</div>
+<script>
+  async function getJson(url){const r=await fetch(url);return r.json();}
+  function fmtTs(ts){return ts?new Date(ts*1000).toLocaleTimeString():'-'}
+
+  async function render(){
+    const [emps, tasks, alerts] = await Promise.all([
+      getJson('/api/employees'),
+      getJson('/api/tasks'),
+      getJson('/api/alerts')
+    ]);
+
+    document.getElementById('employees').innerHTML = `
+      <table><thead><tr><th>名称</th><th>岗位</th><th>状态</th><th>运行中任务</th><th>成功/失败</th></tr></thead><tbody>
+      ${(emps.items||[]).map(e=>`<tr><td>${e.name}</td><td>${e.role}</td><td>${e.status}</td><td>${e.active_task_count}</td><td>${e.success_count}/${e.failure_count}</td></tr>`).join('')}
+      </tbody></table>`;
+
+    document.getElementById('tasks').innerHTML = `
+      <table><thead><tr><th>ID</th><th>类型</th><th>状态</th><th>步骤数</th><th>更新时间</th></tr></thead><tbody>
+      ${(tasks.items||[]).slice(0,20).map(t=>`<tr><td>${t.id}</td><td>${t.task_type}</td><td>${t.status}</td><td>${(t.steps||[]).length}</td><td>${fmtTs(t.updated_at)}</td></tr>`).join('')}
+      </tbody></table>`;
+
+    document.getElementById('alerts').innerHTML = `
+      <table><thead><tr><th>级别</th><th>类型</th><th>消息</th><th>时间</th></tr></thead><tbody>
+      ${(alerts.items||[]).slice(0,20).map(a=>`<tr><td>${a.severity}</td><td>${a.type}</td><td>${a.message}</td><td>${fmtTs(a.created_at)}</td></tr>`).join('') || '<tr><td colspan="4">暂无告警</td></tr>'}
+      </tbody></table>`;
+  }
+
+  async function createTask(){
+    await fetch('/api/tasks', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({task_type:'highway_incident_response', priority:'P1'})
+    });
+    await render();
+  }
+
+  render();
+  setInterval(render, 1500);
+</script>
+</body>
+</html>
