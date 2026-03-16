@@ -10,3 +10,8 @@
 
 ## MVP 规划
 - `docs/mvp-scope-piagent-portal.md`：PiAgent + 企业数字员工管理 Portal 的最小 MVP 范围与实施步骤
+
+
+## 应用目录规划
+- `apps/admin-portal/`：企业数字员工后台管理应用（管理端）
+- `apps/highway-rescue-demo/`：高速无人协同救援前端演示（地图 + Mock 服务）
