@@ -114,6 +114,10 @@
 </header>
 <div class="wrap">
   <div class="card">
+    <h3>🫀 Agent Runtime</h3>
+    <div id="runtime"></div>
+  </div>
+  <div class="card">
     <h3>🧠 数字员工</h3>
     <div id="employees"></div>
   </div>
@@ -130,6 +134,10 @@
     <div id="tasks"></div>
   </div>
   <div class="card">
+    <h3>📡 Agent 指令总线（到 Mock 设备）</h3>
+    <div id="commands"></div>
+  </div>
+  <div class="card">
     <h3>🚨 告警中心</h3>
     <div id="alerts"></div>
   </div>
@@ -143,11 +151,18 @@
   }
 
   async function render(){
-    const [emps, tasks, alerts] = await Promise.all([
+    const [runtime, emps, tasks, commands, alerts] = await Promise.all([
+      getJson('/api/agent-runtime'),
       getJson('/api/employees'),
       getJson('/api/tasks'),
+      getJson('/api/commands'),
       getJson('/api/alerts')
     ]);
+
+    document.getElementById('runtime').innerHTML = `
+      <table><thead><tr><th>Agent</th><th>引擎</th><th>状态</th><th>心跳</th><th>累计指令</th></tr></thead><tbody>
+      <tr><td>${runtime.agent_id}</td><td>${runtime.engine}</td><td>${badge(runtime.status)}</td><td>${fmtTs(runtime.last_heartbeat)}</td><td>${runtime.issued_command_count}</td></tr>
+      </tbody></table>`;
 
     document.getElementById('employees').innerHTML = `
       <table><thead><tr><th>名称</th><th>岗位</th><th>状态</th><th>运行中任务</th><th>成功/失败</th></tr></thead><tbody>
@@ -157,6 +172,11 @@
     document.getElementById('tasks').innerHTML = `
       <table><thead><tr><th>ID</th><th>类型</th><th>状态</th><th>步骤数</th><th>更新时间</th></tr></thead><tbody>
       ${(tasks.items||[]).slice(0,20).map(t=>`<tr><td>${t.id}</td><td>${t.task_type}</td><td>${badge(t.status)}</td><td>${(t.steps||[]).length}</td><td>${fmtTs(t.updated_at)}</td></tr>`).join('')}
+      </tbody></table>`;
+
+    document.getElementById('commands').innerHTML = `
+      <table><thead><tr><th>ID</th><th>资产</th><th>动作</th><th>状态</th><th>下发时间</th></tr></thead><tbody>
+      ${(commands.items||[]).slice(0,20).map(c=>`<tr><td>${c.id}</td><td>${c.asset_id}</td><td>${c.action}</td><td>${badge(c.status)}</td><td>${fmtTs(c.created_at)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">暂无指令</td></tr>'}
       </tbody></table>`;
 
     document.getElementById('alerts').innerHTML = `

@@ -25,3 +25,6 @@ python3 server.py
 - `GET /api/scenario`
 - `POST /api/scenario/reset`
 - `GET /api/alerts`
+- `GET /api/commands`
+- `GET /api/audit-logs`
+- `GET /api/agent-runtime`
