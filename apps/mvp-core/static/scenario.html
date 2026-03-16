@@ -31,6 +31,8 @@
     <div id="incident">当前事故：无</div>
     <h3>设备状态</h3>
     <div id="assets"></div>
+    <h3>Agent 指令流</h3>
+    <div id="commands"></div>
     <h3>事件日志</h3>
     <div id="logs"></div>
   </div>
@@ -52,8 +54,10 @@
     markers[id].bindPopup(popup);
   }
   async function refresh(){
-    const res=await fetch('/api/scenario');
-    const data=await res.json();
+    const [data, commandsResp] = await Promise.all([
+      fetch('/api/scenario').then(r=>r.json()),
+      fetch('/api/commands').then(r=>r.json())
+    ]);
     const assets=Object.values(data.assets||{});
     document.getElementById('assets').innerHTML=assets.map(a=>{
       upsert(a.id,a.lat,a.lng,icons[a.type],`${a.name}<br/>${a.status}`);
@@ -67,6 +71,7 @@
       document.getElementById('incident').innerText='当前事故：无';
     }
     document.getElementById('logs').innerHTML=(data.logs||[]).slice().reverse().slice(0,20).map(l=>`<div class="log">[${new Date(l.ts*1000).toLocaleTimeString()}] ${l.message}</div>`).join('');
+    document.getElementById('commands').innerHTML=(commandsResp.items||[]).slice(0,12).map(c=>`<div class="log">[${new Date(c.created_at*1000).toLocaleTimeString()}] ${c.issued_by} -> ${c.asset_id}：${c.action}（${c.status}）</div>`).join('') || '<div class="log">暂无指令</div>';
   }
   async function triggerTask(){
     await fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task_type:'highway_incident_response',priority:'P1'})});

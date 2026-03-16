@@ -31,7 +31,16 @@ state = {
         }
     },
     "tasks": {},
+    "commands": [],
+    "audit_logs": [],
     "alerts": [],
+    "agent_runtime": {
+        "agent_id": "piagent_runtime_001",
+        "engine": "PiAgent-MockRuntime",
+        "status": "online",
+        "last_heartbeat": time.time(),
+        "issued_command_count": 0,
+    },
     "scenario": {
         "incident": None,
         "assets": {
@@ -56,11 +65,91 @@ def scenario_log(message: str):
     sc["last_updated"] = now()
 
 
+def append_audit(action: str, target: str, result: str, trace_id: str, actor_type="agent", detail=None):
+    state["audit_logs"].append({
+        "id": f"audit_{uuid.uuid4().hex[:8]}",
+        "trace_id": trace_id,
+        "actor_type": actor_type,
+        "action": action,
+        "target": target,
+        "result": result,
+        "detail": detail or {},
+        "timestamp": now(),
+    })
+    state["audit_logs"] = state["audit_logs"][-200:]
+
+
+def emit_command(task_id: str, trace_id: str, asset_id: str, action: str, target=None):
+    cmd = {
+        "id": f"cmd_{uuid.uuid4().hex[:8]}",
+        "task_id": task_id,
+        "trace_id": trace_id,
+        "issued_by": state["agent_runtime"]["agent_id"],
+        "asset_id": asset_id,
+        "action": action,
+        "target": target or {},
+        "status": "sent",
+        "created_at": now(),
+        "updated_at": now(),
+        "executed_at": None,
+    }
+    state["commands"].append(cmd)
+    state["commands"] = state["commands"][-300:]
+    state["agent_runtime"]["last_heartbeat"] = now()
+    state["agent_runtime"]["issued_command_count"] += 1
+    append_audit(
+        action="issue_command",
+        target=f"{asset_id}:{action}",
+        result="sent",
+        trace_id=trace_id,
+        detail={"task_id": task_id, "command_id": cmd["id"]},
+    )
+    return cmd
+
+
+def execute_mock_command(command: dict, duration=6):
+    def _run():
+        with state_lock:
+            command["status"] = "executing"
+            command["updated_at"] = now()
+            asset = state["scenario"]["assets"][command["asset_id"]]
+            start_lat, start_lng = asset["lat"], asset["lng"]
+            target = command["target"]
+            target_lat = target.get("lat", start_lat)
+            target_lng = target.get("lng", start_lng)
+            asset["status"] = command["action"]
+
+        for i in range(1, duration + 1):
+            t = i / duration
+            with state_lock:
+                asset = state["scenario"]["assets"][command["asset_id"]]
+                asset["lat"] = start_lat + (target_lat - start_lat) * t
+                asset["lng"] = start_lng + (target_lng - start_lng) * t
+                state["scenario"]["last_updated"] = now()
+            time.sleep(1)
+
+        with state_lock:
+            command["status"] = "acked"
+            command["updated_at"] = now()
+            command["executed_at"] = now()
+            append_audit(
+                action="command_ack",
+                target=f"{command['asset_id']}:{command['action']}",
+                result="acked",
+                trace_id=command["trace_id"],
+                actor_type="system",
+                detail={"command_id": command["id"], "task_id": command["task_id"]},
+            )
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def create_task(task_type: str, payload: dict):
     task_id = f"task_{uuid.uuid4().hex[:8]}"
     task = {
         "id": task_id,
         "employee_id": "eda_highway_001",
+        "trace_id": f"tr_{uuid.uuid4().hex[:10]}",
         "task_type": task_type,
         "status": "queued",
         "priority": payload.get("priority", "P1"),
@@ -78,6 +167,7 @@ def create_task(task_type: str, payload: dict):
         emp = state["employees"][task["employee_id"]]
         emp["active_task_count"] += 1
         emp["updated_at"] = now()
+        append_audit("create_task", task_id, "accepted", task["trace_id"], actor_type="user")
     threading.Thread(target=run_agent_task, args=(task_id,), daemon=True).start()
     return task
 
@@ -95,24 +185,6 @@ def append_step(task, name, status="running", detail=None):
     return step
 
 
-def move_asset(asset_id, target_lat, target_lng, status, duration=6):
-    def _run():
-        with state_lock:
-            asset = state["scenario"]["assets"][asset_id]
-            start_lat, start_lng = asset["lat"], asset["lng"]
-            asset["status"] = status
-        for i in range(1, duration + 1):
-            t = i / duration
-            with state_lock:
-                asset = state["scenario"]["assets"][asset_id]
-                asset["lat"] = start_lat + (target_lat - start_lat) * t
-                asset["lng"] = start_lng + (target_lng - start_lng) * t
-                state["scenario"]["last_updated"] = now()
-            time.sleep(1)
-
-    threading.Thread(target=_run, daemon=True).start()
-
-
 def run_agent_task(task_id: str):
     with state_lock:
         task = state["tasks"].get(task_id)
@@ -126,13 +198,16 @@ def run_agent_task(task_id: str):
         # plan
         with state_lock:
             task = state["tasks"][task_id]
+            trace_id = task["trace_id"]
             append_step(task, "Plan", "running", {"message": "识别事故并规划协同处置流程"})
             scenario_log(f"任务 {task_id}：PiAgent 开始规划处置流程。")
+            append_audit("plan", task_id, "ok", trace_id)
         time.sleep(1)
 
         # detect/recon
         with state_lock:
             task = state["tasks"][task_id]
+            trace_id = task["trace_id"]
             lat = task["input"].get("lat", BASE_LAT + random.uniform(-0.01, 0.01))
             lng = task["input"].get("lng", BASE_LNG + random.uniform(-0.01, 0.01))
             state["scenario"]["incident"] = {
@@ -144,34 +219,41 @@ def run_agent_task(task_id: str):
             }
             append_step(task, "Recon", "success", {"incident": state["scenario"]["incident"]})
             scenario_log("侦查无人机发现事故点，开始盘旋侦查。")
-        move_asset("recon_drone", lat, lng, "盘旋侦查", duration=5)
+            cmd = emit_command(task_id, trace_id, "recon_drone", "盘旋侦查", {"lat": lat, "lng": lng})
+            execute_mock_command(cmd, duration=5)
         time.sleep(2)
 
         # firefighting
         with state_lock:
             task = state["tasks"][task_id]
+            trace_id = task["trace_id"]
             incident = state["scenario"]["incident"]
             append_step(task, "Dispatch Fire Drone", "running", {"target": incident})
             scenario_log("消防无人机启动，前往事故点灭火。")
-        move_asset("fire_drone", incident["lat"] + 0.0015, incident["lng"] - 0.0015, "灭火作业", duration=7)
+            cmd = emit_command(task_id, trace_id, "fire_drone", "灭火作业", {"lat": incident["lat"] + 0.0015, "lng": incident["lng"] - 0.0015})
+            execute_mock_command(cmd, duration=7)
         time.sleep(2)
 
         # rescue dog
         with state_lock:
             task = state["tasks"][task_id]
+            trace_id = task["trace_id"]
             incident = state["scenario"]["incident"]
             append_step(task, "Dispatch Rescue Dog", "running", {"target": incident})
             scenario_log("救援无人狗出发，执行伤员定位与现场救援。")
-        move_asset("rescue_dog", incident["lat"] - 0.001, incident["lng"] + 0.001, "现场搜救", duration=9)
+            cmd = emit_command(task_id, trace_id, "rescue_dog", "现场搜救", {"lat": incident["lat"] - 0.001, "lng": incident["lng"] + 0.001})
+            execute_mock_command(cmd, duration=9)
         time.sleep(3)
 
         # review/finish
         with state_lock:
             task = state["tasks"][task_id]
+            trace_id = task["trace_id"]
             incident = state["scenario"]["incident"]
             incident["status"] = "处置中"
             append_step(task, "Review", "success", {"message": "火情受控，救援进行中"})
             scenario_log("PiAgent 复核：火情受控，救援进展正常。")
+            append_audit("review", task_id, "ok", trace_id)
         time.sleep(2)
 
         with state_lock:
@@ -191,6 +273,7 @@ def run_agent_task(task_id: str):
             emp["success_count"] += 1
             emp["active_task_count"] = max(0, emp["active_task_count"] - 1)
             emp["updated_at"] = now()
+            append_audit("complete", task_id, "succeeded", trace_id)
     except Exception as exc:
         with state_lock:
             task = state["tasks"].get(task_id)
@@ -213,6 +296,7 @@ def run_agent_task(task_id: str):
                 emp["failure_count"] += 1
                 emp["active_task_count"] = max(0, emp["active_task_count"] - 1)
                 emp["updated_at"] = now()
+                append_audit("complete", task_id, "failed", task.get("trace_id", "tr_unknown"), detail={"error": str(exc)})
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -263,6 +347,18 @@ class Handler(BaseHTTPRequestHandler):
             with state_lock:
                 alerts = list(reversed(state["alerts"][-50:]))
             return self._json({"items": alerts})
+        if p == "/api/commands":
+            with state_lock:
+                commands = list(reversed(state["commands"][-100:]))
+            return self._json({"items": commands})
+        if p == "/api/audit-logs":
+            with state_lock:
+                logs = list(reversed(state["audit_logs"][-100:]))
+            return self._json({"items": logs})
+        if p == "/api/agent-runtime":
+            with state_lock:
+                rt = dict(state["agent_runtime"])
+            return self._json(rt)
         if p == "/":
             return self._serve(Path(__file__).parent / "static" / "index.html")
         if p == "/console":
