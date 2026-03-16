@@ -1,0 +1,115 @@
+name: CI Checks
+
+on:
+  pull_request:
+  push:
+    branches: ["main", "master", "work"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python-compile:
+    name: Python Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile Python files
+        run: python -m compileall apps
+
+  smoke-highway-rescue-demo:
+    name: Smoke Test Highway Rescue Demo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Start server
+        run: |
+          python apps/highway-rescue-demo/server.py > /tmp/highway-server.log 2>&1 &
+          echo $! > /tmp/highway-server.pid
+
+      - name: Wait for server
+        run: |
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:8000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server not ready"
+          cat /tmp/highway-server.log
+          exit 1
+
+      - name: API smoke checks
+        run: |
+          curl -fsS http://127.0.0.1:8000/api/health
+          curl -fsS http://127.0.0.1:8000/api/state
+          curl -fsS -X POST http://127.0.0.1:8000/api/incidents/mock -H 'Content-Type: application/json' -d '{}'
+          curl -fsS -X POST http://127.0.0.1:8000/api/reset -H 'Content-Type: application/json' -d '{}'
+
+      - name: Stop server
+        if: always()
+        run: |
+          kill "$(cat /tmp/highway-server.pid)" || true
+          sleep 1
+          cat /tmp/highway-server.log || true
+
+  smoke-mvp-core:
+    name: Smoke Test MVP Core
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Start server
+        run: |
+          python apps/mvp-core/server.py > /tmp/mvp-core.log 2>&1 &
+          echo $! > /tmp/mvp-core.pid
+
+      - name: Wait for server
+        run: |
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:8100/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server not ready"
+          cat /tmp/mvp-core.log
+          exit 1
+
+      - name: API smoke checks
+        run: |
+          curl -fsS http://127.0.0.1:8100/api/health
+          curl -fsS http://127.0.0.1:8100/api/employees
+          curl -fsS http://127.0.0.1:8100/api/tasks
+          task_id=$(curl -fsS -X POST http://127.0.0.1:8100/api/tasks -H 'Content-Type: application/json' -d '{}' | python -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+          curl -fsS "http://127.0.0.1:8100/api/tasks/${task_id}"
+          curl -fsS http://127.0.0.1:8100/api/scenario
+          curl -fsS -X POST http://127.0.0.1:8100/api/scenario/reset -H 'Content-Type: application/json' -d '{}'
+
+      - name: Stop server
+        if: always()
+        run: |
+          kill "$(cat /tmp/mvp-core.pid)" || true
+          sleep 1
+          cat /tmp/mvp-core.log || true
