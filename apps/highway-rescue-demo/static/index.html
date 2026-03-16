@@ -13,6 +13,7 @@
       .panel { background: white; border-radius: 8px; padding: 12px; overflow: auto; }
       .btn { background: #0f4c81; color: white; border: 0; border-radius: 6px; padding: 8px 10px; cursor: pointer; margin-right: 8px; }
       .btn.secondary { background: #6c757d; }
+      .mode { font-size: 12px; opacity: 0.9; margin-left: 10px; }
       .kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
       .kpi div { background: #eef3fa; border-radius: 6px; padding: 8px; font-size: 14px; }
       .log { border-bottom: 1px solid #eee; padding: 6px 0; font-size: 13px; }
@@ -21,7 +22,10 @@
   </head>
   <body>
     <header>
-      <div>高速无人机/无人狗协同救援 Demo（PiAgent 场景 Mock）</div>
+      <div>
+        高速无人机/无人狗协同救援 Demo（PiAgent 场景 Mock）
+        <span id="mode" class="mode">检测中...</span>
+      </div>
       <div>
         <button class="btn" onclick="createIncident()">触发事故事件</button>
         <button class="btn secondary" onclick="resetDemo()">重置</button>
@@ -51,7 +55,10 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-      const map = L.map('map').setView([31.2304, 121.4737], 12);
+      const BASE_LAT = 31.2304;
+      const BASE_LNG = 121.4737;
+
+      const map = L.map('map').setView([BASE_LAT, BASE_LNG], 12);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors'
@@ -65,6 +72,93 @@
       };
 
       const markers = {};
+      let mode = 'detecting';
+
+      const browserMock = {
+        state: {
+          last_updated: Date.now() / 1000,
+          incident: null,
+          assets: {
+            recon_drone: { id: 'recon_drone', type: 'recon_drone', name: '侦查无人机-01', status: '巡航中', lat: BASE_LAT + 0.02, lng: BASE_LNG - 0.03 },
+            fire_drone: { id: 'fire_drone', type: 'fire_drone', name: '消防无人机-01', status: '待命', lat: BASE_LAT - 0.01, lng: BASE_LNG + 0.02 },
+            rescue_dog: { id: 'rescue_dog', type: 'rescue_dog', name: '救援无人狗-01', status: '待命', lat: BASE_LAT - 0.015, lng: BASE_LNG - 0.01 }
+          },
+          logs: [{ ts: Date.now() / 1000, message: '浏览器内置 mock 已启动，等待事件...' }]
+        },
+        log(msg) {
+          this.state.logs.push({ ts: Date.now() / 1000, message: msg });
+          this.state.logs = this.state.logs.slice(-100);
+          this.state.last_updated = Date.now() / 1000;
+        },
+        moveAsset(assetId, targetLat, targetLng, status, duration = 8) {
+          const asset = this.state.assets[assetId];
+          const startLat = asset.lat;
+          const startLng = asset.lng;
+          const steps = Math.max(duration, 1);
+          asset.status = status;
+          let i = 0;
+          const timer = setInterval(() => {
+            i += 1;
+            const t = i / steps;
+            asset.lat = startLat + (targetLat - startLat) * t;
+            asset.lng = startLng + (targetLng - startLng) * t;
+            this.state.last_updated = Date.now() / 1000;
+            if (i >= steps) clearInterval(timer);
+          }, 1000);
+        },
+        triggerIncident(lat = BASE_LAT + (Math.random() - 0.5) * 0.02, lng = BASE_LNG + (Math.random() - 0.5) * 0.02) {
+          const incidentId = `INC-${Math.floor(Date.now() / 1000)}`;
+          this.state.incident = { id: incidentId, type: '交通事故', status: '已发现', lat, lng };
+          this.log(`${incidentId} 侦查无人机发现高速事故点。`);
+          this.moveAsset('recon_drone', lat, lng, '盘旋侦查', 5);
+
+          setTimeout(() => {
+            this.log('消防无人机启动，前往事故点灭火。');
+            this.moveAsset('fire_drone', lat + 0.0015, lng - 0.0015, '灭火作业', 7);
+          }, 3000);
+
+          setTimeout(() => {
+            this.log('救援无人狗前往事故点，执行现场救援与伤员定位。');
+            this.moveAsset('rescue_dog', lat - 0.001, lng + 0.001, '现场搜救', 9);
+          }, 6000);
+
+          setTimeout(() => {
+            if (this.state.incident) this.state.incident.status = '处置中';
+            this.log('事故处置进行中：火情受控，救援进展正常。');
+          }, 12000);
+
+          setTimeout(() => {
+            if (this.state.incident) this.state.incident.status = '已完成';
+            this.state.assets.recon_drone.status = '返航';
+            this.state.assets.fire_drone.status = '返航';
+            this.state.assets.rescue_dog.status = '待命';
+            this.log('事故处置完成，设备返航/待命，任务闭环结束。');
+          }, 20000);
+        },
+        reset() {
+          this.state.incident = null;
+          this.state.assets.recon_drone = { id: 'recon_drone', type: 'recon_drone', name: '侦查无人机-01', status: '巡航中', lat: BASE_LAT + 0.02, lng: BASE_LNG - 0.03 };
+          this.state.assets.fire_drone = { id: 'fire_drone', type: 'fire_drone', name: '消防无人机-01', status: '待命', lat: BASE_LAT - 0.01, lng: BASE_LNG + 0.02 };
+          this.state.assets.rescue_dog = { id: 'rescue_dog', type: 'rescue_dog', name: '救援无人狗-01', status: '待命', lat: BASE_LAT - 0.015, lng: BASE_LNG - 0.01 };
+          this.log('系统已重置。');
+        }
+      };
+
+      function setMode(m) {
+        mode = m;
+        document.getElementById('mode').innerText = m === 'api' ? '模式：后端 API 模式' : '模式：GitHub Pages 浏览器 Mock 模式';
+      }
+
+      async function detectMode() {
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 1000);
+          const r = await fetch('/api/health', { signal: controller.signal });
+          clearTimeout(timeout);
+          if (r.ok) return setMode('api');
+        } catch (_) {}
+        setMode('browser-mock');
+      }
 
       function upsertMarker(id, lat, lng, icon, popup) {
         if (!markers[id]) {
@@ -75,10 +169,16 @@
         markers[id].bindPopup(popup);
       }
 
-      async function fetchState() {
-        const res = await fetch('/api/state');
-        const data = await res.json();
+      async function getState() {
+        if (mode === 'api') {
+          const res = await fetch('/api/state');
+          return res.json();
+        }
+        return browserMock.state;
+      }
 
+      async function fetchState() {
+        const data = await getState();
         const incidentEl = document.getElementById('incident');
         const assetsEl = document.getElementById('assets');
         const logsEl = document.getElementById('logs');
@@ -111,17 +211,28 @@
       }
 
       async function createIncident() {
-        await fetch('/api/incidents/mock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        if (mode === 'api') {
+          await fetch('/api/incidents/mock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        } else {
+          browserMock.triggerIncident();
+        }
         await fetchState();
       }
 
       async function resetDemo() {
-        await fetch('/api/reset', { method: 'POST' });
+        if (mode === 'api') {
+          await fetch('/api/reset', { method: 'POST' });
+        } else {
+          browserMock.reset();
+        }
         await fetchState();
       }
 
-      fetchState();
-      setInterval(fetchState, 1000);
+      (async () => {
+        await detectMode();
+        await fetchState();
+        setInterval(fetchState, 1000);
+      })();
     </script>
   </body>
 </html>
