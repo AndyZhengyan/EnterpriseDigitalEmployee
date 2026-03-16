@@ -23,3 +23,7 @@
 
 ## 核心 MVP 运行入口
 - `apps/mvp-core/`：核心 Agent + 核心控制台 + 高速事故处理场景 Demo（一体化可运行）
+
+
+## 协作提交流程
+- `docs/git-sync-workflow.md`：提交前拉取最新代码、处理冲突并重新提交的标准流程
