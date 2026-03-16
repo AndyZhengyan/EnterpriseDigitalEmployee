@@ -5,43 +5,142 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>数字员工控制台 MVP</title>
   <style>
-    body{margin:0;font-family:Arial,sans-serif;background:#f5f7fb}
-    header{background:#1f3f72;color:#fff;padding:12px 16px}
-    .wrap{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    .card{background:#fff;border-radius:8px;padding:12px}
-    table{width:100%;border-collapse:collapse;font-size:13px}
-    th,td{border-bottom:1px solid #eee;padding:6px;text-align:left}
-    button{background:#1f3f72;color:#fff;border:0;border-radius:6px;padding:8px 10px;cursor:pointer}
-    .muted{color:#666;font-size:12px}
+    :root{
+      --bg:#0b1020;
+      --panel:#121a2d;
+      --panel-soft:#18233b;
+      --line:#243454;
+      --text:#eaf1ff;
+      --muted:#9fb0d3;
+      --accent:#7aa2ff;
+      --success:#4ade80;
+      --warn:#fbbf24;
+      --danger:#f87171;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:"Inter","PingFang SC","Microsoft YaHei",sans-serif;
+      color:var(--text);
+      background:radial-gradient(circle at 20% -10%, #1f2e5d 0%, #0b1020 45%, #080c18 100%);
+      min-height:100vh;
+    }
+    header{
+      margin:18px;
+      padding:18px 20px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:linear-gradient(135deg, rgba(122,162,255,.15), rgba(122,162,255,.03));
+      box-shadow:var(--shadow);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .title{font-size:20px;font-weight:700;letter-spacing:.2px}
+    .subtitle{color:var(--muted);font-size:13px}
+
+    .wrap{
+      padding:0 18px 18px;
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+    }
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(4px);
+    }
+    .card h3{
+      margin:0 0 10px;
+      font-size:15px;
+      font-weight:600;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+    th,td{padding:9px 8px;text-align:left;border-bottom:1px solid rgba(159,176,211,.18)}
+    th{color:#c7d7ff;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    tbody tr:hover td{background:rgba(122,162,255,.08)}
+
+    .btn{
+      background:linear-gradient(135deg,#7aa2ff,#608dff);
+      color:#071028;
+      border:0;
+      border-radius:10px;
+      padding:10px 14px;
+      font-weight:700;
+      cursor:pointer;
+      transition:.2s transform,.2s box-shadow;
+      box-shadow:0 8px 18px rgba(122,162,255,.35);
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .muted{color:var(--muted);font-size:12px}
+    .inline{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    a{color:#9ec2ff}
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      border:1px solid transparent;
+      border-radius:999px;
+      padding:2px 8px;
+      font-size:12px;
+      line-height:1.35;
+      font-weight:600;
+    }
+    .b-online,.b-succeeded,.b-success{color:var(--success);background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.25)}
+    .b-running,.b-queued{color:var(--warn);background:rgba(251,191,36,.12);border-color:rgba(251,191,36,.25)}
+    .b-failed,.b-high{color:var(--danger);background:rgba(248,113,113,.12);border-color:rgba(248,113,113,.25)}
+
+    @media (max-width: 960px){
+      .wrap{grid-template-columns:1fr}
+    }
   </style>
 </head>
 <body>
 <header>
-  核心控制台 MVP（数字员工 / 任务 / 告警）
+  <div>
+    <div class="title">🤖 核心控制台 · 数字员工中枢</div>
+    <div class="subtitle">现代 AI 风格视图：任务编排、告警监控、自动执行</div>
+  </div>
+  <span class="badge b-online">● SYSTEM ONLINE</span>
 </header>
 <div class="wrap">
   <div class="card">
-    <h3>数字员工</h3>
+    <h3>🧠 数字员工</h3>
     <div id="employees"></div>
   </div>
   <div class="card">
-    <h3>操作</h3>
-    <button onclick="createTask()">创建高速事故处置任务</button>
-    <span class="muted">（将由核心 Agent 自动执行）</span>
-    <p><a href="/scenario">查看场景地图 Demo</a></p>
+    <h3>⚡ 操作台</h3>
+    <div class="inline">
+      <button class="btn" onclick="createTask()">创建高速事故处置任务</button>
+      <span class="muted">由核心 Agent 自动规划并执行</span>
+    </div>
+    <p class="muted" style="margin-top:12px"><a href="/scenario">查看场景地图 Demo →</a></p>
   </div>
   <div class="card">
-    <h3>任务列表</h3>
+    <h3>📋 任务列表</h3>
     <div id="tasks"></div>
   </div>
   <div class="card">
-    <h3>告警</h3>
+    <h3>🚨 告警中心</h3>
     <div id="alerts"></div>
   </div>
 </div>
 <script>
   async function getJson(url){const r=await fetch(url);return r.json();}
   function fmtTs(ts){return ts?new Date(ts*1000).toLocaleTimeString():'-'}
+  function badge(v){
+    const key=String(v||'').toLowerCase();
+    return `<span class="badge b-${key}">${v||'-'}</span>`;
+  }
 
   async function render(){
     const [emps, tasks, alerts] = await Promise.all([
@@ -52,17 +151,17 @@
 
     document.getElementById('employees').innerHTML = `
       <table><thead><tr><th>名称</th><th>岗位</th><th>状态</th><th>运行中任务</th><th>成功/失败</th></tr></thead><tbody>
-      ${(emps.items||[]).map(e=>`<tr><td>${e.name}</td><td>${e.role}</td><td>${e.status}</td><td>${e.active_task_count}</td><td>${e.success_count}/${e.failure_count}</td></tr>`).join('')}
+      ${(emps.items||[]).map(e=>`<tr><td>${e.name}</td><td>${e.role}</td><td>${badge(e.status)}</td><td>${e.active_task_count}</td><td>${e.success_count}/${e.failure_count}</td></tr>`).join('')}
       </tbody></table>`;
 
     document.getElementById('tasks').innerHTML = `
       <table><thead><tr><th>ID</th><th>类型</th><th>状态</th><th>步骤数</th><th>更新时间</th></tr></thead><tbody>
-      ${(tasks.items||[]).slice(0,20).map(t=>`<tr><td>${t.id}</td><td>${t.task_type}</td><td>${t.status}</td><td>${(t.steps||[]).length}</td><td>${fmtTs(t.updated_at)}</td></tr>`).join('')}
+      ${(tasks.items||[]).slice(0,20).map(t=>`<tr><td>${t.id}</td><td>${t.task_type}</td><td>${badge(t.status)}</td><td>${(t.steps||[]).length}</td><td>${fmtTs(t.updated_at)}</td></tr>`).join('')}
       </tbody></table>`;
 
     document.getElementById('alerts').innerHTML = `
       <table><thead><tr><th>级别</th><th>类型</th><th>消息</th><th>时间</th></tr></thead><tbody>
-      ${(alerts.items||[]).slice(0,20).map(a=>`<tr><td>${a.severity}</td><td>${a.type}</td><td>${a.message}</td><td>${fmtTs(a.created_at)}</td></tr>`).join('') || '<tr><td colspan="4">暂无告警</td></tr>'}
+      ${(alerts.items||[]).slice(0,20).map(a=>`<tr><td>${badge(a.severity)}</td><td>${a.type}</td><td>${a.message}</td><td>${fmtTs(a.created_at)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">暂无告警</td></tr>'}
       </tbody></table>`;
   }
 
