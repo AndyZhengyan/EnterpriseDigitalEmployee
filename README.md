@@ -19,6 +19,7 @@
 
 ## 部署
 - `apps/highway-rescue-demo/` 已支持 GitHub Pages 自动部署（见 `.github/workflows/deploy-highway-demo-pages.yml`）
+- 新增全仓 CI 工作流：`.github/workflows/ci.yml`（Python 语法检查 + 两个 Demo 服务 API 冒烟检查）
 
 
 ## 核心 MVP 运行入口
