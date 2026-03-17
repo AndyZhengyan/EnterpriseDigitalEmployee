@@ -3,528 +3,418 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>高速事故智能协同作战台</title>
+    <title>公路巡检 Codex · Tactical Intelligence Center</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
       :root {
-        --bg: #07111d;
-        --panel: rgba(8, 21, 36, 0.78);
-        --line: rgba(92, 222, 255, 0.45);
-        --cyan: #56f0ff;
-        --blue: #5aa8ff;
-        --green: #45ffa3;
-        --warn: #ffcc66;
-        --danger: #ff5a7a;
-        --text: #d8ecff;
-        --muted: #9ab7d0;
+        --bg: #0f1012;
+        --panel: rgba(20, 23, 27, 0.84);
+        --panel-strong: rgba(15, 17, 20, 0.96);
+        --line: rgba(116, 147, 178, 0.28);
+        --text: #d5dde5;
+        --muted: #7f8a97;
+        --ok: #48e29f;
+        --warn: #f2b35d;
+        --critical: #ff6b7f;
+        --link: #72c7ff;
+        --focus: #9d7bff;
       }
 
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        font-family: "Inter", "Segoe UI", "PingFang SC", sans-serif;
-        background: radial-gradient(circle at 30% 0, #143f69 0%, var(--bg) 38%, #040914 100%);
+        font-family: "IBM Plex Sans", "Inter", "Segoe UI", sans-serif;
+        background: radial-gradient(circle at 40% -20%, #252c36 0%, #121417 32%, #0d0f11 100%);
         color: var(--text);
         min-height: 100vh;
       }
-
-      .hud {
+      .scanline {
         position: fixed;
         inset: 0;
         pointer-events: none;
-        background: repeating-linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0.02) 0,
-          rgba(255, 255, 255, 0.02) 1px,
-          transparent 2px,
-          transparent 4px
-        );
-        opacity: 0.25;
-        z-index: 1;
+        background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.025), rgba(255,255,255,0.025) 1px, transparent 2px, transparent 4px);
+        opacity: 0.2;
+        z-index: 2;
       }
-
-      #app { position: relative; z-index: 2; }
-
+      #app { position: relative; z-index: 3; height: 100vh; display: grid; grid-template-rows: 56px 1fr 92px; }
       header {
-        height: 72px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0 20px;
-        border-bottom: 1px solid var(--line);
-        background: rgba(4, 14, 26, 0.75);
-        backdrop-filter: blur(6px);
-      }
-
-      .title { font-size: 18px; font-weight: 700; letter-spacing: 0.08em; }
-      .subtitle { font-size: 12px; color: var(--muted); margin-top: 2px; }
-      .mode { font-size: 12px; color: var(--cyan); }
-
-      .btn-wrap { display: flex; gap: 10px; }
-      .btn {
-        background: linear-gradient(135deg, rgba(39, 109, 209, 0.9), rgba(19, 192, 255, 0.85));
-        color: #eaf6ff;
-        border: 1px solid rgba(130, 221, 255, 0.55);
-        border-radius: 8px;
-        padding: 9px 12px;
-        font-size: 13px;
-        cursor: pointer;
-        box-shadow: 0 0 18px rgba(65, 194, 255, 0.3);
-      }
-      .btn.secondary { background: rgba(20, 42, 63, 0.95); }
-
-      .layout {
-        height: calc(100vh - 72px);
         display: grid;
-        grid-template-columns: 2.15fr 1fr;
-        gap: 12px;
-        padding: 12px;
+        grid-template-columns: 320px 1fr 380px;
+        gap: 10px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(10, 12, 14, 0.9);
       }
-
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 12px;
-        box-shadow: inset 0 0 30px rgba(23, 93, 140, 0.25), 0 8px 30px rgba(2, 6, 12, 0.45);
-      }
-
-      .map-card { position: relative; overflow: hidden; }
-      #map { width: 100%; height: 100%; }
-      .map-tag {
-        position: absolute;
-        top: 12px;
-        left: 12px;
-        background: rgba(2, 15, 24, 0.72);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 8px 10px;
-        font-size: 12px;
-        z-index: 500;
-      }
-
-      .side {
-        padding: 14px;
-        overflow: auto;
-      }
-
-      h3 {
-        margin: 8px 0 10px;
+      .title {
         font-size: 14px;
         letter-spacing: 0.08em;
-        color: var(--cyan);
+        text-transform: uppercase;
       }
-
-      .incident {
-        border: 1px solid rgba(125, 207, 255, 0.35);
-        background: rgba(9, 33, 57, 0.7);
+      .subtitle { font-size: 11px; color: var(--muted); margin-top: 3px; }
+      .oracle {
+        background: rgba(17, 21, 26, 0.88);
+        border: 1px solid rgba(125, 154, 185, 0.33);
         border-radius: 8px;
-        padding: 10px;
+        padding: 6px 10px;
+        color: #dce7f3;
         font-size: 13px;
+        width: 100%;
       }
-
-      .kpi {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+      .tagline {
+        display: flex;
         gap: 8px;
-        margin: 10px 0;
+        justify-content: flex-end;
+        align-items: center;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 11px;
+      }
+      .chip {
+        padding: 4px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(129, 159, 190, 0.4);
+        background: rgba(31, 39, 48, 0.7);
       }
 
-      .kpi-item {
-        background: rgba(7, 32, 54, 0.78);
-        border: 1px solid rgba(97, 185, 255, 0.35);
+      .layout {
+        display: grid;
+        grid-template-columns: 320px 1fr 360px;
+        gap: 10px;
+        padding: 10px 12px;
+        min-height: 0;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        backdrop-filter: blur(4px);
+        min-height: 0;
+      }
+      .left, .right { padding: 10px; overflow: auto; }
+      h3 {
+        margin: 6px 0 8px;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #b0c9e2;
+      }
+      .list-item {
+        border: 1px solid rgba(116, 147, 178, 0.28);
+        border-left: 3px solid transparent;
+        border-radius: 8px;
+        padding: 8px;
+        margin-bottom: 8px;
+        font-size: 12px;
+        cursor: pointer;
+        background: rgba(16, 20, 24, 0.72);
+      }
+      .list-item.active { border-left-color: var(--focus); background: rgba(36, 30, 58, 0.55); }
+      .meta { color: var(--muted); font-size: 11px; margin-top: 3px; }
+      .sev-ok { color: var(--ok); }
+      .sev-warn { color: var(--warn); }
+      .sev-critical { color: var(--critical); }
+      .toggle-group label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: #b7c4d0; }
+
+      .map-wrap { position: relative; overflow: hidden; }
+      #map { width: 100%; height: 100%; background: #0f1012; }
+      .overlay-caption {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        background: rgba(10, 14, 18, 0.84);
+        border: 1px solid var(--line);
+        padding: 6px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        font-family: "IBM Plex Mono", monospace;
+        z-index: 500;
+      }
+      .network {
+        background: rgba(13, 17, 23, 0.78);
+        border: 1px solid rgba(116, 147, 178, 0.3);
         border-radius: 8px;
         padding: 8px;
       }
-      .kpi-label { font-size: 11px; color: var(--muted); }
-      .kpi-value { font-size: 18px; font-weight: 700; margin-top: 4px; }
-
-      .asset, .log {
-        border-left: 2px solid rgba(95, 221, 255, 0.55);
-        background: rgba(7, 29, 47, 0.68);
+      .dossier-card {
+        padding: 8px;
+        border: 1px solid rgba(116, 147, 178, 0.3);
+        border-radius: 8px;
+        background: rgba(12, 16, 20, 0.78);
         margin-bottom: 8px;
-        border-radius: 6px;
-        padding: 8px 10px;
         font-size: 12px;
       }
-      .asset .name { font-weight: 700; }
-      .status-active { color: var(--green); }
-      .status-warn { color: var(--warn); }
-      .status-danger { color: var(--danger); }
+      .metric { display: grid; grid-template-columns: 1fr auto; font-size: 12px; margin: 5px 0; }
+      .metric span:last-child { font-family: "IBM Plex Mono", monospace; }
 
-      .leaflet-container { background: #05101d; }
+      .timeline {
+        margin: 0 12px 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--panel-strong);
+      }
+      .timeline-top { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+      input[type='range'] { width: 100%; margin-top: 10px; accent-color: #7bb9ff; }
+      .timeline-labels {
+        margin-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 10px;
+      }
+      .leaflet-container { background: #111317; }
+      .entity-icon {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid #dbe9f7;
+        box-shadow: 0 0 10px currentColor;
+      }
+      .entity-label { font-size: 11px; color: #ebf3ff; text-shadow: 0 0 6px #000; }
     </style>
   </head>
   <body>
     <div id="app">
       <header>
         <div>
-          <div class="title">高速事故智能协同作战台 / Highway Rescue Command</div>
-          <div class="subtitle">Gotham-inspired mission HUD · 全链路事件推演</div>
+          <div class="title">Road Inspection Codex / Tactical Center</div>
+          <div class="subtitle">Object-centric · Graph-linked · Geospatial Overlay</div>
         </div>
-        <div class="btn-wrap">
-          <span class="mode">{{ modeText }}</span>
-          <button class="btn" @click="createIncident">触发事故推演</button>
-          <button class="btn secondary" @click="resetDemo">任务复位</button>
+        <div><input class="oracle" v-model="query" @keyup.enter="runSearch" placeholder="神谕搜索：最近三天 裂缝 > 20cm 绕城高速" /></div>
+        <div class="tagline">
+          <span class="chip">LIVE FEED {{ currentFrame.timeLabel }}</span>
+          <span class="chip">PRIORITY {{ highPriorityCount }}</span>
+          <span class="chip">MODE Tactical Dark</span>
         </div>
       </header>
 
       <div class="layout">
-        <div class="card map-card">
-          <div class="map-tag">沪宁高速 · 实时态势 / Tactical Feed</div>
+        <aside class="panel left">
+          <h3>图层控制</h3>
+          <div class="toggle-group">
+            <label><input type="checkbox" v-model="layers.vector" @change="updateLayers" /> 暗色矢量底图</label>
+            <label><input type="checkbox" v-model="layers.satellite" @change="updateLayers" /> 卫星底图</label>
+            <label><input type="checkbox" v-model="layers.heat" @change="renderMap" /> 风险热力叠加</label>
+            <label><input type="checkbox" v-model="layers.links" @change="renderMap" /> 关系链路</label>
+          </div>
+          <h3>巡检实体</h3>
+          <div class="list-item" v-for="d in currentFrame.defects" :key="d.id" :class="{active: selectedEntity && selectedEntity.id===d.id}" @click="selectDefect(d)">
+            <strong>{{ d.type }}</strong>
+            <div class="meta">{{ d.id }} · {{ d.road }} · 置信度 {{ Math.round(d.confidence*100) }}%</div>
+            <div :class="severityClass(d.severity)">严重度：{{ d.severity }} · 长度 {{ d.sizeCm }}cm</div>
+          </div>
+          <h3>巡检车辆</h3>
+          <div class="list-item" v-for="v in currentFrame.vehicles" :key="v.id">
+            <strong>{{ v.name }}</strong>
+            <div class="meta">{{ v.id }} · {{ v.zone }}</div>
+            <div>{{ v.status }}</div>
+          </div>
+        </aside>
+
+        <section class="panel map-wrap">
+          <div class="overlay-caption">沪宁高速巡检走廊 · Tactical Geospatial Overlay</div>
           <div id="map"></div>
-        </div>
+        </section>
 
-        <div class="card side">
-          <h3>事件态势</h3>
-          <div class="incident">{{ incidentText }}</div>
-
-          <div class="kpi">
-            <div class="kpi-item"><div class="kpi-label">在线设备</div><div class="kpi-value">{{ kpi.online }}</div></div>
-            <div class="kpi-item"><div class="kpi-label">执行任务</div><div class="kpi-value">{{ kpi.running }}</div></div>
-            <div class="kpi-item"><div class="kpi-label">事故状态</div><div class="kpi-value">{{ kpi.status }}</div></div>
-            <div class="kpi-item"><div class="kpi-label">更新时间</div><div class="kpi-value" style="font-size:12px">{{ kpi.update }}</div></div>
+        <aside class="panel right">
+          <h3>关联图谱</h3>
+          <div class="network">
+            <svg width="100%" height="160" viewBox="0 0 320 160">
+              <defs>
+                <filter id="glow"><feGaussianBlur stdDeviation="2" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+              </defs>
+              <line x1="42" y1="35" x2="160" y2="80" stroke="#72c7ff" stroke-width="1.5" filter="url(#glow)"/>
+              <line x1="160" y1="80" x2="274" y2="125" stroke="#9d7bff" stroke-width="1.5" filter="url(#glow)"/>
+              <circle cx="42" cy="35" r="13" fill="#48e29f"/><text x="28" y="60" fill="#cdd8e2" font-size="11">巡检车</text>
+              <circle cx="160" cy="80" r="13" fill="#ff6b7f"/><text x="146" y="108" fill="#cdd8e2" font-size="11">路损点</text>
+              <circle cx="274" cy="125" r="13" fill="#f2b35d"/><text x="248" y="151" fill="#cdd8e2" font-size="11">责任工区</text>
+            </svg>
           </div>
 
-          <h3>设备状态</h3>
-          <div v-for="asset in assets" :key="asset.id" class="asset">
-            <div class="name">{{ asset.name }}</div>
-            <div :class="statusClass(asset.status)">状态：{{ asset.status }}</div>
-            <div>坐标：{{ asset.lat.toFixed(5) }}, {{ asset.lng.toFixed(5) }}</div>
+          <h3>调查流 / Dossier</h3>
+          <div class="dossier-card" v-if="selectedEntity">
+            <div><strong>{{ selectedEntity.id }}</strong> · {{ selectedEntity.type }}</div>
+            <div class="meta">发现时间：{{ currentFrame.timeLabel }} · 关联车辆：{{ selectedVehicle?.name || 'N/A' }}</div>
+            <div class="metric"><span>AI识别置信度</span><span>{{ Math.round(selectedEntity.confidence*100) }}%</span></div>
+            <div class="metric"><span>历史修补强度</span><span>{{ selectedEntity.repairIntensity }}</span></div>
+            <div class="metric"><span>预测性维护建议</span><span>{{ selectedEntity.recommendation }}</span></div>
           </div>
+          <div class="dossier-card" v-else>请选择左侧路损实体查看完整生命周期。</div>
 
-          <h3>事件日志</h3>
-          <div v-for="log in logs" :key="log.ts + log.message" class="log">
-            [{{ formatTime(log.ts) }}] {{ log.message }}
-          </div>
-        </div>
+          <h3>任务日志</h3>
+          <div class="dossier-card" v-for="log in latestLogs" :key="log">{{ log }}</div>
+        </aside>
       </div>
+
+      <footer class="timeline">
+        <div class="timeline-top">
+          <div>时间旅行轴：拖动查看巡检车轨迹、路损演化与工区响应链路</div>
+          <button class="chip" style="cursor:pointer" @click="autoplay = !autoplay">{{ autoplay ? '暂停' : '播放' }}</button>
+        </div>
+        <input type="range" min="0" :max="frames.length - 1" step="1" v-model.number="frameIndex" @input="renderMap" />
+        <div class="timeline-labels"><span v-for="f in frames" :key="f.timeLabel">{{ f.timeLabel }}</span></div>
+      </footer>
     </div>
-    <div class="hud"></div>
+    <div class="scanline"></div>
 
     <script type="module">
       import { createApp } from 'https://unpkg.com/vue@3/dist/vue.esm-browser.prod.js';
       import L from 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/+esm';
 
-      const BASE_LAT = 31.2304;
-      const BASE_LNG = 121.4737;
+      const base = [31.2304, 121.4737];
+      const frames = [
+        {
+          timeLabel: '06:00',
+          vehicles: [
+            { id: 'V-21', name: '巡检车-21', status: '例行巡航', zone: '工区A', lat: 31.236, lng: 121.43 },
+            { id: 'V-11', name: '巡检车-11', status: '道路影像采集', zone: '工区B', lat: 31.209, lng: 121.488 }
+          ],
+          defects: [
+            { id: 'D-901', type: '裂缝', severity: '关注', road: '绕城高速', sizeCm: 22, confidence: 0.81, lat: 31.226, lng: 121.448, repairIntensity: '中', recommendation: '48小时内灌缝处理' }
+          ],
+          logs: ['06:00 巡检任务启动，图像流接入完成。']
+        },
+        {
+          timeLabel: '09:00',
+          vehicles: [
+            { id: 'V-21', name: '巡检车-21', status: '复核裂缝点位', zone: '工区A', lat: 31.229, lng: 121.451 },
+            { id: 'V-11', name: '巡检车-11', status: '例行巡航', zone: '工区B', lat: 31.22, lng: 121.51 }
+          ],
+          defects: [
+            { id: 'D-901', type: '裂缝', severity: '关注', road: '绕城高速', sizeCm: 26, confidence: 0.87, lat: 31.226, lng: 121.448, repairIntensity: '中', recommendation: '24小时内灌缝并封闭慢车道' },
+            { id: 'D-944', type: '护栏损坏', severity: '严重', road: '沪宁高速', sizeCm: 120, confidence: 0.91, lat: 31.24, lng: 121.49, repairIntensity: '高', recommendation: '立即更换并发布绕行指令' }
+          ],
+          logs: ['09:00 D-944 由 V-11 发现，升级至严重告警。']
+        },
+        {
+          timeLabel: '12:00',
+          vehicles: [
+            { id: 'V-21', name: '巡检车-21', status: '现场交通引导', zone: '工区A', lat: 31.239, lng: 121.486 },
+            { id: 'V-11', name: '巡检车-11', status: '积水复核', zone: '工区B', lat: 31.214, lng: 121.503 }
+          ],
+          defects: [
+            { id: 'D-944', type: '护栏损坏', severity: '严重', road: '沪宁高速', sizeCm: 120, confidence: 0.93, lat: 31.24, lng: 121.49, repairIntensity: '高', recommendation: '已派发维护队列 M-7' },
+            { id: 'D-977', type: '积水', severity: '紧急', road: '外环高速', sizeCm: 300, confidence: 0.89, lat: 31.217, lng: 121.502, repairIntensity: '中', recommendation: '立即排水并临时封控' }
+          ],
+          logs: ['12:00 D-977 雨后形成积水，优先级升为紧急。']
+        },
+        {
+          timeLabel: '15:00',
+          vehicles: [
+            { id: 'V-21', name: '巡检车-21', status: '恢复巡航', zone: '工区A', lat: 31.233, lng: 121.462 },
+            { id: 'V-11', name: '巡检车-11', status: '协同维护验收', zone: '工区B', lat: 31.221, lng: 121.496 }
+          ],
+          defects: [
+            { id: 'D-977', type: '积水', severity: '关注', road: '外环高速', sizeCm: 80, confidence: 0.74, lat: 31.217, lng: 121.502, repairIntensity: '低', recommendation: '监测排水系统并回访' }
+          ],
+          logs: ['15:00 紧急告警解除，进入回访阶段。']
+        }
+      ];
 
-      const app = createApp({
+      createApp({
         data() {
           return {
-            mode: 'detecting',
             map: null,
-            markers: {},
-            state: {
-              last_updated: Date.now() / 1000,
-              incident: null,
-              assets: {},
-              logs: []
-            },
-            browserMock: null
+            vectorLayer: null,
+            satelliteLayer: null,
+            markers: [],
+            polylines: [],
+            heatCircles: [],
+            frameIndex: 0,
+            frames,
+            layers: { vector: true, satellite: false, heat: true, links: true },
+            selectedEntity: null,
+            query: '',
+            autoplay: true
           };
         },
         computed: {
-          modeText() {
-            return this.mode === 'api' ? '模式：后端 API 联动' : '模式：浏览器战术沙盘';
+          currentFrame() { return this.frames[this.frameIndex]; },
+          highPriorityCount() { return this.currentFrame.defects.filter((d) => ['严重', '紧急'].includes(d.severity)).length; },
+          selectedVehicle() {
+            if (!this.selectedEntity) return null;
+            return this.currentFrame.vehicles.find((v) => Math.abs(v.lat - this.selectedEntity.lat) + Math.abs(v.lng - this.selectedEntity.lng) < 0.05) || this.currentFrame.vehicles[0];
           },
-          assets() {
-            return Object.values(this.state.assets || {});
-          },
-          logs() {
-            return (this.state.logs || []).slice().reverse().slice(0, 16);
-          },
-          kpi() {
-            const running = this.assets.filter((a) => !['待命', '巡航中', '返航'].includes(a.status)).length;
-            return {
-              online: this.assets.length,
-              running,
-              status: this.state.incident?.status || '无',
-              update: this.formatTime(this.state.last_updated)
-            };
-          },
-          incidentText() {
-            if (!this.state.incident) return '当前事件：无';
-            const i = this.state.incident;
-            return `当前事件：${i.id}（${i.type}）· 状态：${i.status}`;
-          }
+          latestLogs() { return this.currentFrame.logs; }
         },
         mounted() {
-          this.initMap();
-          this.initMock();
-          this.bootstrap();
+          this.map = L.map('map', { zoomControl: false }).setView(base, 11.8);
+          this.vectorLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; OpenStreetMap & CARTO' });
+          this.satelliteLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
+          this.updateLayers();
+          this.selectedEntity = this.currentFrame.defects[0] || null;
+          this.renderMap();
+          setInterval(() => {
+            if (!this.autoplay) return;
+            this.frameIndex = (this.frameIndex + 1) % this.frames.length;
+            this.renderMap();
+          }, 4000);
         },
         methods: {
-          formatTime(ts) {
-            if (!ts) return '-';
-            return new Date(ts * 1000).toLocaleTimeString();
+          severityClass(sev) {
+            if (sev === '关注') return 'sev-warn';
+            if (sev === '严重' || sev === '紧急') return 'sev-critical';
+            return 'sev-ok';
           },
-          statusClass(status) {
-            if (['灭火作业', '现场搜救', '盘旋侦查'].includes(status)) return 'status-active';
-            if (['处置中', '已发现'].includes(status)) return 'status-warn';
-            return 'status-danger';
+          selectDefect(defect) {
+            this.selectedEntity = defect;
+            this.renderMap();
           },
-          initMap() {
-            this.map = L.map('map', { zoomControl: false }).setView([BASE_LAT, BASE_LNG], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              maxZoom: 19,
-              attribution: '&copy; OpenStreetMap contributors'
-            }).addTo(this.map);
-          },
-          iconByType(type) {
-            const html = {
-              recon_drone: '🛰️',
-              fire_drone: '🚁',
-              rescue_dog: '🤖',
-              incident: '🚧'
-            }[type] || '📍';
-            return L.divIcon({ html, className: '', iconSize: [26, 26] });
-          },
-          upsertMarker(id, lat, lng, type, popup) {
-            if (!this.markers[id]) {
-              this.markers[id] = L.marker([lat, lng], { icon: this.iconByType(type) }).addTo(this.map);
-            } else {
-              this.markers[id].setLatLng([lat, lng]);
+          runSearch() {
+            const text = this.query.toLowerCase();
+            const match = this.currentFrame.defects.find((d) => text.includes(d.type) || text.includes(d.id.toLowerCase()) || text.includes(d.road));
+            if (match) {
+              this.selectedEntity = match;
+              this.map.flyTo([match.lat, match.lng], 13, { duration: 0.8 });
+              this.renderMap();
             }
-            this.markers[id].bindPopup(popup);
           },
-          initMock() {
-            this.browserMock = {
-              state: {
-                last_updated: Date.now() / 1000,
-                incident: null,
-                assets: {
-                  recon_drone: { id: 'recon_drone', type: 'recon_drone', name: '侦查无人机-01', status: '巡航中', lat: BASE_LAT + 0.02, lng: BASE_LNG - 0.03 },
-                  fire_drone: { id: 'fire_drone', type: 'fire_drone', name: '消防无人机-01', status: '待命', lat: BASE_LAT - 0.01, lng: BASE_LNG + 0.02 },
-                  rescue_dog: { id: 'rescue_dog', type: 'rescue_dog', name: '救援无人狗-01', status: '待命', lat: BASE_LAT - 0.015, lng: BASE_LNG - 0.01 }
-                },
-                logs: [{ ts: Date.now() / 1000, message: '战术沙盘初始化完成，等待任务下发。' }]
-              },
-              log: (msg) => {
-                this.browserMock.state.logs.push({ ts: Date.now() / 1000, message: msg });
-                this.browserMock.state.logs = this.browserMock.state.logs.slice(-100);
-                this.browserMock.state.last_updated = Date.now() / 1000;
-              },
-              moveAsset: (assetId, targetLat, targetLng, status, duration = 8) => {
-                const asset = this.browserMock.state.assets[assetId];
-                const startLat = asset.lat;
-                const startLng = asset.lng;
-                const steps = Math.max(duration, 1);
-                asset.status = status;
-                let i = 0;
-                const timer = setInterval(() => {
-                  i += 1;
-                  const t = i / steps;
-                  asset.lat = startLat + (targetLat - startLat) * t;
-                  asset.lng = startLng + (targetLng - startLng) * t;
-                  this.browserMock.state.last_updated = Date.now() / 1000;
-                  if (i >= steps) clearInterval(timer);
-                }, 1000);
-              },
-              triggerIncident: (lat = BASE_LAT + (Math.random() - 0.5) * 0.02, lng = BASE_LNG + (Math.random() - 0.5) * 0.02) => {
-                const incidentId = `INC-${Math.floor(Date.now() / 1000)}`;
-                this.browserMock.state.incident = { id: incidentId, type: '交通事故', status: '已发现', lat, lng };
-                this.browserMock.log(`${incidentId} 侦查无人机完成事故识别。`);
-                this.browserMock.moveAsset('recon_drone', lat, lng, '盘旋侦查', 5);
-                setTimeout(() => {
-                  this.browserMock.log('消防无人机启动灭火链路。');
-                  this.browserMock.moveAsset('fire_drone', lat + 0.0015, lng - 0.0015, '灭火作业', 7);
-                }, 3000);
-                setTimeout(() => {
-                  this.browserMock.log('救援无人狗执行近地搜索。');
-                  this.browserMock.moveAsset('rescue_dog', lat - 0.001, lng + 0.001, '现场搜救', 9);
-                }, 6000);
-                setTimeout(() => {
-                  if (this.browserMock.state.incident) this.browserMock.state.incident.status = '处置中';
-                  this.browserMock.log('态势更新：火情受控，伤员定位完成。');
-                }, 12000);
-                setTimeout(() => {
-                  if (this.browserMock.state.incident) this.browserMock.state.incident.status = '已完成';
-                  this.browserMock.state.assets.recon_drone.status = '返航';
-                  this.browserMock.state.assets.fire_drone.status = '返航';
-                  this.browserMock.state.assets.rescue_dog.status = '待命';
-                  this.browserMock.log('任务闭环：事故处置完成。');
-                }, 20000);
-              },
-              reset: () => {
-                this.browserMock.state.incident = null;
-                this.browserMock.state.assets.recon_drone = { id: 'recon_drone', type: 'recon_drone', name: '侦查无人机-01', status: '巡航中', lat: BASE_LAT + 0.02, lng: BASE_LNG - 0.03 };
-                this.browserMock.state.assets.fire_drone = { id: 'fire_drone', type: 'fire_drone', name: '消防无人机-01', status: '待命', lat: BASE_LAT - 0.01, lng: BASE_LNG + 0.02 };
-                this.browserMock.state.assets.rescue_dog = { id: 'rescue_dog', type: 'rescue_dog', name: '救援无人狗-01', status: '待命', lat: BASE_LAT - 0.015, lng: BASE_LNG - 0.01 };
-                this.browserMock.log('系统复位完成。');
+          updateLayers() {
+            [this.vectorLayer, this.satelliteLayer].forEach((layer) => layer && this.map.removeLayer(layer));
+            if (this.layers.vector) this.vectorLayer.addTo(this.map);
+            if (this.layers.satellite) this.satelliteLayer.addTo(this.map);
+            this.renderMap();
+          },
+          clearDynamic() {
+            [...this.markers, ...this.polylines, ...this.heatCircles].forEach((l) => this.map.removeLayer(l));
+            this.markers = []; this.polylines = []; this.heatCircles = [];
+          },
+          renderMap() {
+            if (!this.map) return;
+            this.clearDynamic();
+            const frame = this.currentFrame;
+            frame.vehicles.forEach((v) => {
+              const marker = L.circleMarker([v.lat, v.lng], { radius: 6, color: '#48e29f', weight: 2, fillOpacity: 0.7 }).addTo(this.map);
+              marker.bindTooltip(`${v.name} · ${v.status}`);
+              this.markers.push(marker);
+            });
+            frame.defects.forEach((d) => {
+              const color = d.severity === '紧急' ? '#ff6b7f' : d.severity === '严重' ? '#f2b35d' : '#72c7ff';
+              const marker = L.circleMarker([d.lat, d.lng], { radius: this.selectedEntity?.id === d.id ? 9 : 7, color, weight: 2, fillOpacity: 0.8 }).addTo(this.map);
+              marker.bindTooltip(`${d.id} · ${d.type}`);
+              marker.on('click', () => this.selectDefect(d));
+              this.markers.push(marker);
+              if (this.layers.heat) {
+                const heat = L.circle([d.lat, d.lng], { radius: 220 + d.sizeCm * 2, color, weight: 1, fillOpacity: 0.08 }).addTo(this.map);
+                this.heatCircles.push(heat);
               }
-            };
-            this.state = this.browserMock.state;
-          },
-          async detectMode() {
-            try {
-              const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 1000);
-              const res = await fetch('/api/health', { signal: controller.signal });
-              clearTimeout(timeout);
-              this.mode = res.ok ? 'api' : 'browser-mock';
-            } catch {
-              this.mode = 'browser-mock';
+            });
+            if (this.layers.links) {
+              frame.defects.forEach((d, index) => {
+                const v = frame.vehicles[index % frame.vehicles.length];
+                const mid = [d.lat + 0.008, d.lng + 0.006];
+                const line = L.polyline([[v.lat, v.lng], [d.lat, d.lng], mid], { color: '#9d7bff', weight: this.selectedEntity?.id === d.id ? 3 : 1.8, opacity: 0.7, dashArray: '6 4' }).addTo(this.map);
+                this.polylines.push(line);
+              });
             }
-          },
-          async getState() {
-            if (this.mode === 'api') {
-              const res = await fetch('/api/state');
-              return res.json();
-            }
-            return this.browserMock.state;
-          },
-          renderMap(state) {
-            this.assets.forEach((a) => this.upsertMarker(a.id, a.lat, a.lng, a.type, `${a.name}<br/>${a.status}`));
-            if (state.incident) {
-              this.upsertMarker('incident', state.incident.lat, state.incident.lng, 'incident', `${state.incident.id}<br/>${state.incident.status}`);
-            }
-          },
-          async refreshState() {
-            const data = await this.getState();
-            this.state = data;
-            this.renderMap(data);
-          },
-          async createIncident() {
-            if (this.mode === 'api') {
-              await fetch('/api/incidents/mock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-            } else {
-              this.browserMock.triggerIncident();
-            }
-            await this.refreshState();
-          },
-          async resetDemo() {
-            if (this.mode === 'api') {
-              await fetch('/api/reset', { method: 'POST' });
-            } else {
-              this.browserMock.reset();
-            }
-            await this.refreshState();
-          },
-          async bootstrap() {
-            await this.detectMode();
-            await this.refreshState();
-            setInterval(this.refreshState, 1000);
+          }
+        },
+        watch: {
+          frameIndex() {
+            this.selectedEntity = this.currentFrame.defects[0] || null;
           }
         }
-      });
-
-      app.mount('#app');
+      }).mount('#app');
     </script>
-    <title>企业数字员工导航中心</title>
-    <style>
-      :root {
-        --bg: #f3f7ff;
-        --card: #ffffff;
-        --text: #1f2a44;
-        --subtle: #5f6f8f;
-        --primary: #2b5bd7;
-        --primary-dark: #1f45ab;
-        --shadow: 0 10px 30px rgba(25, 52, 110, 0.12);
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-        background: radial-gradient(circle at top, #eaf1ff 0%, var(--bg) 42%, #eef2fb 100%);
-        color: var(--text);
-        min-height: 100vh;
-      }
-      .wrap {
-        max-width: 980px;
-        margin: 0 auto;
-        padding: 64px 20px 48px;
-      }
-      .hero {
-        text-align: center;
-        margin-bottom: 36px;
-      }
-      .hero h1 {
-        margin: 0 0 12px;
-        font-size: clamp(28px, 4vw, 40px);
-      }
-      .hero p {
-        margin: 0;
-        color: var(--subtle);
-        font-size: 16px;
-      }
-      .grid {
-        display: grid;
-        gap: 18px;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      }
-      .card {
-        background: var(--card);
-        border-radius: 16px;
-        padding: 22px;
-        box-shadow: var(--shadow);
-        border: 1px solid #e4ebfb;
-      }
-      .card h2 {
-        margin-top: 0;
-        margin-bottom: 10px;
-        font-size: 21px;
-      }
-      .card p {
-        margin-top: 0;
-        color: var(--subtle);
-        line-height: 1.6;
-        min-height: 56px;
-      }
-      .meta {
-        font-size: 13px;
-        color: #7484a8;
-        margin-bottom: 16px;
-      }
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        width: 100%;
-        text-decoration: none;
-        border-radius: 10px;
-        padding: 11px 14px;
-        color: white;
-        background: linear-gradient(135deg, var(--primary), #4a74e5);
-        font-weight: 600;
-        transition: transform .2s ease, background .2s ease;
-      }
-      .btn:hover {
-        transform: translateY(-1px);
-        background: linear-gradient(135deg, var(--primary-dark), #3b67de);
-      }
-      footer {
-        text-align: center;
-        color: #7886a6;
-        font-size: 13px;
-        margin-top: 30px;
-      }
-    </style>
-  </head>
-  <body>
-    <main class="wrap">
-      <section class="hero">
-        <h1>企业数字员工站点导航</h1>
-        <p>将「管理配置页面」与「高速事故 Demo」分离，便于在 GitHub Pages 独立访问与演示。</p>
-      </section>
-
-      <section class="grid">
-        <article class="card">
-          <h2>管理配置页面</h2>
-          <p>用于展示企业数字员工后台管理与配置入口，包含管理指标、模块列表与后续集成说明。</p>
-          <div class="meta">路径：<code>/admin-config.html</code></div>
-          <a class="btn" href="./admin-config.html">进入管理配置页面</a>
-        </article>
-
-        <article class="card">
-          <h2>高速事故救援 Demo</h2>
-          <p>无人机 / 无人狗协同救援可视化演示，支持 GitHub Pages 浏览器 Mock 与后端 API 模式。</p>
-          <div class="meta">路径：<code>/highway-demo.html</code></div>
-          <a class="btn" href="./highway-demo.html">进入高速事故 Demo</a>
-        </article>
-      </section>
-
-      <footer>EnterpriseDigitalEmployee · GitHub Pages Navigation</footer>
-    </main>
   </body>
 </html>
