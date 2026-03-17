@@ -12,8 +12,8 @@
 - 重点策略：PiAgent 原生内核 + 企业治理外壳
 
 
-## MVP 规划
-- `docs/mvp-scope-piagent-portal.md`：PiAgent + 企业数字员工管理 Portal 的最小 MVP 范围与实施步骤
+## 分层实施规划（L1 基线 → L4 完善）
+- `docs/mvp-scope-piagent-portal.md`：企业数字员工分层演进实施方案（L1 基线可用到 L4 企业完善）
 
 
 ## 应用目录规划
@@ -26,8 +26,8 @@
 - 新增全仓 CI 工作流：`.github/workflows/ci.yml`（Python 语法检查 + 两个 Demo 服务 API 冒烟检查）
 
 
-## 核心 MVP 运行入口
-- `apps/mvp-core/`：核心 Agent + 核心控制台 + 高速事故处理场景 Demo（一体化可运行）
+## 核心基线运行入口（L1 Sandbox）
+- `apps/mvp-core/`：L1 基线能力沙箱（核心 Agent + 控制台 + 场景 Demo），后续能力在同一底座叠加
 
 
 ## 协作提交流程
