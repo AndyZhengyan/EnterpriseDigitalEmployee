@@ -8,7 +8,7 @@ import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 HOST = "0.0.0.0"
 PORT = 8100
@@ -96,6 +96,44 @@ state = {
 
 def now():
     return time.time()
+
+
+def compute_duration_ms(task: dict):
+    if task.get("started_at") and task.get("finished_at"):
+        return int((task["finished_at"] - task["started_at"]) * 1000)
+    return None
+
+
+def task_view(task: dict):
+    copied = dict(task)
+    copied["duration_ms"] = compute_duration_ms(task)
+    copied["fail_reason"] = task.get("error")
+    copied.setdefault("source_channel", task.get("source_channel", "feishu"))
+    return copied
+
+
+def employee_metrics(employee_id: str):
+    with state_lock:
+        tasks = [t for t in state["tasks"].values() if t.get("employee_id") == employee_id]
+    total = len(tasks)
+    succeeded = sum(1 for t in tasks if t.get("status") == "succeeded")
+    failed = sum(1 for t in tasks if t.get("status") == "failed")
+    escalated = sum(1 for t in tasks if t.get("status") == "escalated")
+    handoff = sum(1 for t in tasks if t.get("status") in {"escalated", "manual_review"})
+    durations = [compute_duration_ms(t) for t in tasks if compute_duration_ms(t) is not None]
+    avg_duration_ms = int(sum(durations) / len(durations)) if durations else None
+    success_rate = round((succeeded / total) * 100, 2) if total else 0.0
+    handoff_rate = round((handoff / total) * 100, 2) if total else 0.0
+    return {
+        "employee_id": employee_id,
+        "total_tasks": total,
+        "succeeded_tasks": succeeded,
+        "failed_tasks": failed,
+        "escalated_tasks": escalated,
+        "success_rate": success_rate,
+        "handoff_rate": handoff_rate,
+        "avg_duration_ms": avg_duration_ms,
+    }
 
 
 def scenario_log(message: str):
@@ -408,6 +446,7 @@ def create_task(task_type: str, payload: dict):
         "task_type": task_type,
         "status": "queued",
         "priority": payload.get("priority", "P1"),
+        "source_channel": payload.get("source_channel", "feishu"),
         "input": payload,
         "result": None,
         "error": None,
@@ -496,6 +535,11 @@ def run_agent_task(task_id: str):
         issued = []
         for cmd_payload in plan.get("commands", []):
             with state_lock:
+                task = state["tasks"].get(task_id)
+                if not task or task.get("status") == "escalated":
+                    scenario_log(f"任务 {task_id} 已转人工，停止自动执行。")
+                    append_audit("stop_after_escalation", task_id, "stopped", trace_id, actor_type="system")
+                    return
                 incident = state["scenario"]["incident"]
                 normalized = normalize_command(cmd_payload, incident)
                 if not normalized:
@@ -507,7 +551,6 @@ def run_agent_task(task_id: str):
                         detail={"command": cmd_payload},
                     )
                     continue
-                task = state["tasks"][task_id]
                 append_step(task, f"Dispatch {normalized['asset_id']}", "running", normalized)
                 scenario_log(f"{normalized['asset_id']} 执行动作：{normalized['action']}。")
                 cmd = emit_command(task_id, trace_id, normalized["asset_id"], normalized["action"], normalized["target"])
@@ -516,7 +559,11 @@ def run_agent_task(task_id: str):
             time.sleep(1)
 
         with state_lock:
-            task = state["tasks"][task_id]
+            task = state["tasks"].get(task_id)
+            if not task or task.get("status") == "escalated":
+                scenario_log(f"任务 {task_id} 已转人工，跳过自动收尾。")
+                append_audit("skip_complete_after_escalation", task_id, "skipped", trace_id, actor_type="system")
+                return
             incident = state["scenario"]["incident"]
             incident["status"] = "已完成"
             state["scenario"]["assets"]["recon_drone"]["status"] = "返航"
@@ -557,6 +604,55 @@ def run_agent_task(task_id: str):
                 append_audit("complete", task_id, "failed", task.get("trace_id", "tr_unknown"), detail={"error": str(exc)})
 
 
+def retry_task(task_id: str):
+    with state_lock:
+        task = state["tasks"].get(task_id)
+        if not task:
+            return None, "not found"
+        if task.get("status") == "running":
+            return None, "task is running"
+        payload = dict(task.get("input") or {})
+        payload["priority"] = task.get("priority", "P1")
+        payload["source_channel"] = task.get("source_channel", "feishu")
+        task_type = task.get("task_type", "highway_incident_response")
+        trace_id = task.get("trace_id", "tr_unknown")
+    new_task = create_task(task_type, payload)
+    with state_lock:
+        append_audit("retry_task", task_id, "accepted", trace_id, actor_type="user", detail={"new_task_id": new_task["id"]})
+    return new_task, None
+
+
+def escalate_task(task_id: str):
+    with state_lock:
+        task = state["tasks"].get(task_id)
+        if not task:
+            return None, "not found"
+        if task.get("status") in {"succeeded", "failed", "escalated"}:
+            return None, f"task already {task.get('status')}"
+        task["status"] = "escalated"
+        task["finished_at"] = now()
+        task["updated_at"] = now()
+        append_step(task, "Escalate", "success", {"message": "人工接管"})
+        emp = state["employees"][task["employee_id"]]
+        emp["handoff_count"] += 1
+        emp["active_task_count"] = max(0, emp["active_task_count"] - 1)
+        emp["updated_at"] = now()
+        append_alert("manual_escalation", f"任务 {task_id} 已转人工", "medium", task_id=task_id)
+        append_audit("escalate_task", task_id, "escalated", task.get("trace_id", "tr_unknown"), actor_type="user")
+        return task_view(task), None
+
+
+def ack_alert(alert_id: str):
+    with state_lock:
+        for alert in state["alerts"]:
+            if alert["id"] == alert_id:
+                alert["status"] = "acknowledged"
+                alert["acked_at"] = now()
+                append_audit("ack_alert", alert_id, "acknowledged", trace_id="tr_alert_ops", actor_type="user")
+                return alert, None
+    return None, "not found"
+
+
 class Handler(BaseHTTPRequestHandler):
     def _json(self, obj, code=200):
         body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -580,15 +676,38 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         p = parsed.path
+        q = parse_qs(parsed.query)
         if p == "/api/health":
             return self._json({"ok": True, "ts": now()})
         if p == "/api/employees":
+            role_filter = (q.get("role") or [None])[0]
+            status_filter = (q.get("status") or [None])[0]
             with state_lock:
                 employees = list(state["employees"].values())
+            if role_filter:
+                employees = [e for e in employees if e.get("role") == role_filter]
+            if status_filter:
+                employees = [e for e in employees if e.get("status") == status_filter]
             return self._json({"items": employees})
-        if p == "/api/tasks":
+        if p.startswith("/api/employees/") and p.endswith("/metrics"):
+            employee_id = p.split("/")[-2]
             with state_lock:
-                tasks = sorted(state["tasks"].values(), key=lambda x: x["created_at"], reverse=True)
+                if employee_id not in state["employees"]:
+                    return self._json({"error": "not found"}, 404)
+            return self._json(employee_metrics(employee_id))
+        if p.startswith("/api/employees/"):
+            employee_id = p.split("/")[-1]
+            with state_lock:
+                emp = state["employees"].get(employee_id)
+            if not emp:
+                return self._json({"error": "not found"}, 404)
+            return self._json(emp)
+        if p == "/api/tasks":
+            status_filter = (q.get("status") or [None])[0]
+            with state_lock:
+                tasks = sorted((task_view(t) for t in state["tasks"].values()), key=lambda x: x["created_at"], reverse=True)
+            if status_filter:
+                tasks = [t for t in tasks if t.get("status") == status_filter]
             return self._json({"items": tasks})
         if p.startswith("/api/tasks/"):
             tid = p.split("/")[-1]
@@ -596,22 +715,28 @@ class Handler(BaseHTTPRequestHandler):
                 task = state["tasks"].get(tid)
             if not task:
                 return self._json({"error": "not found"}, 404)
-            return self._json(task)
+            return self._json(task_view(task))
         if p == "/api/scenario":
             with state_lock:
                 sc = state["scenario"]
             return self._json(sc)
         if p == "/api/alerts":
+            status_filter = (q.get("status") or [None])[0]
             with state_lock:
                 alerts = list(reversed(state["alerts"][-50:]))
+            if status_filter:
+                alerts = [a for a in alerts if a.get("status") == status_filter]
             return self._json({"items": alerts})
         if p == "/api/commands":
             with state_lock:
                 commands = list(reversed(state["commands"][-100:]))
             return self._json({"items": commands})
         if p == "/api/audit-logs":
+            trace_id = (q.get("trace_id") or [None])[0]
             with state_lock:
                 logs = list(reversed(state["audit_logs"][-100:]))
+            if trace_id:
+                logs = [log for log in logs if log.get("trace_id") == trace_id]
             return self._json({"items": logs})
         if p == "/api/agent-runtime":
             with state_lock:
@@ -647,7 +772,28 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/api/tasks":
             task_type = payload.get("task_type", "highway_incident_response")
             task = create_task(task_type, payload)
-            return self._json(task, 201)
+            return self._json(task_view(task), 201)
+
+        if parsed.path.startswith("/api/tasks/") and parsed.path.endswith("/retry"):
+            task_id = parsed.path.split("/")[-2]
+            new_task, err = retry_task(task_id)
+            if err:
+                return self._json({"error": err}, 400 if err != "not found" else 404)
+            return self._json(task_view(new_task), 201)
+
+        if parsed.path.startswith("/api/tasks/") and parsed.path.endswith("/escalate"):
+            task_id = parsed.path.split("/")[-2]
+            task, err = escalate_task(task_id)
+            if err:
+                return self._json({"error": err}, 400 if err != "not found" else 404)
+            return self._json(task)
+
+        if parsed.path.startswith("/api/alerts/") and parsed.path.endswith("/ack"):
+            alert_id = parsed.path.split("/")[-2]
+            alert, err = ack_alert(alert_id)
+            if err:
+                return self._json({"error": err}, 404)
+            return self._json(alert)
 
         if parsed.path == "/api/scenario/reset":
             with state_lock:

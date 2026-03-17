@@ -50,12 +50,17 @@ python3 server.py
 ## API（核心）
 - `GET /api/health`
 - `GET /api/employees`
+- `GET /api/employees/{id}`
+- `GET /api/employees/{id}/metrics`
 - `GET /api/tasks`
 - `GET /api/tasks/{id}`
 - `POST /api/tasks`
+- `POST /api/tasks/{id}/retry`
+- `POST /api/tasks/{id}/escalate`
 - `GET /api/scenario`
 - `POST /api/scenario/reset`
 - `GET /api/alerts`
+- `POST /api/alerts/{id}/ack`
 - `GET /api/commands`
-- `GET /api/audit-logs`
+- `GET /api/audit-logs`（支持 `trace_id` 过滤）
 - `GET /api/agent-runtime`
