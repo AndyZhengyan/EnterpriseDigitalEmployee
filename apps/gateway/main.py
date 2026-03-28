@@ -11,6 +11,9 @@ from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field
+from slowapi import Limiter, RateLimitExceeded
+from slowapi.errors import RateLimitExceeded as RateLimitExc
+from slowapi.util import get_remote_address
 
 from common.errors import EAgentError, ErrorCode
 from common.models import BaseResponse, Channel, Priority, TaskStatus, TaskType
@@ -39,6 +42,11 @@ def verify_webhook(request: Request) -> bool:
     """Verify webhook request via X-Webhook-Secret header."""
     secret = request.headers.get("x-webhook-secret", "")
     return secrets.compare_digest(secret, WEBHOOK_SECRET) if WEBHOOK_SECRET else False
+
+
+# ============== Rate limiting ==============
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 # ============== FastAPI App ==============
@@ -96,6 +104,7 @@ async def _dispatch_to_runtime(request: DispatchRequest, trace_id: str) -> Dispa
 # ============== 路由 ==============
 
 @app.post("/gateway/dispatch", response_model=DispatchResponse)
+@limiter.limit("60/minute")
 async def dispatch_task(req: DispatchRequest, request: Request, client_id: str = Depends(get_current_client)):
     """
     任务分发接口。
@@ -201,6 +210,18 @@ async def health_check():
 
 
 # ============== 异常处理 ==============
+
+@app.exception_handler(RateLimitExc)
+async def rate_limit_handler(request: Request, exc: RateLimitExc):
+    """Rate limit exceeded handler"""
+    return JSONResponse(
+        status_code=429,
+        content=BaseResponse(
+            success=False,
+            error=ErrorCode.GATEWAY_RATE_LIMITED.to_dict(details="Rate limit exceeded. Retry after 1 minute."),
+        ).model_dump(),
+    )
+
 
 @app.exception_handler(EAgentError)
 async def eagent_error_handler(request: Request, exc: EAgentError):

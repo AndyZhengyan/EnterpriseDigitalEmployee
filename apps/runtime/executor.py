@@ -9,11 +9,11 @@ from __future__ import annotations
 import asyncio
 import enum
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from apps.runtime.models import PlanStep, TaskResult
 
-from .piagent_client import PiAgentClient, PiAgentError, PiAgentResult
+from .piagent_client import PiAgentClient, PiAgentError, PiAgentResult, PiAgentTimeoutError
 
 
 class ExecutionState(enum.Enum):
@@ -159,10 +159,16 @@ class RuntimeExecutor:
         )
 
         loop = asyncio.get_event_loop()
-        piagent_result = await loop.run_in_executor(
-            None,
-            lambda: self.piagent.invoke(prompt),
-        )
+        try:
+            piagent_result = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                timeout=self.timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            raise PiAgentTimeoutError(
+                f"Plan generation timed out after {self.timeout_seconds}s",
+                agent_id=self.agent_id,
+            )
 
         if not piagent_result.text:
             raise PiAgentError("Empty response from PiAgent during plan generation", agent_id=self.agent_id)
@@ -241,9 +247,9 @@ class RuntimeExecutor:
                     prompt = f"执行步骤：{step.type}\n输入：{json_module.dumps(step.input, ensure_ascii=False)}"
 
                 loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: self.piagent.invoke(prompt),
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                    timeout=self.timeout_seconds,
                 )
 
                 return {
@@ -298,9 +304,9 @@ class RuntimeExecutor:
         )
 
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(
-            None,
-            lambda: self.piagent.invoke(prompt),
+        result = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+            timeout=self.timeout_seconds,
         )
 
         if not result.text:
