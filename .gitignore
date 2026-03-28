@@ -46,3 +46,9 @@ Thumbs.db
 
 # Coverage
 *.prof
+
+# Local config overrides (may contain secrets)
+config/
+secrets.yaml
+secrets.json
+credentials.*

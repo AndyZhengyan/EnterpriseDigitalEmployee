@@ -115,15 +115,27 @@ class PiAgentClient:
         token = os.environ.get("OPENCLAW_GATEWAY_TOKEN")
         if token:
             return token
-        # 回退：从 openclaw 配置文件读取
         config_path = os.path.expanduser("~/.openclaw/openclaw.json")
         try:
             with open(config_path) as f:
-                import json
                 cfg = json.load(f)
                 return cfg.get("gateway", {}).get("auth", {}).get("token", "")
-        except Exception:
-            return ""
+        except FileNotFoundError:
+            raise PiAgentError(
+                f"OpenClaw config not found at {config_path}. "
+                "Run `openclaw gateway init` to configure.",
+                agent_id=None,
+            )
+        except json.JSONDecodeError as e:
+            raise PiAgentError(
+                f"Invalid OpenClaw config at {config_path}: {e}",
+                agent_id=None,
+            )
+        except KeyError:
+            raise PiAgentError(
+                f"OpenClaw config at {config_path} is missing 'gateway.auth.token' field.",
+                agent_id=None,
+            )
 
     def __init__(
         self,
@@ -154,7 +166,13 @@ class PiAgentClient:
         return args
 
     def _get_gateway_url(self) -> str:
-        """获取 Gateway URL（用于环境变量）"""
+        """
+        获取 Gateway URL（用于环境变量）
+
+        Note: Always use https:// in production. HTTP is only acceptable
+        on localhost (127.0.0.1). When deploying, ensure OPENCLAW_GATEWAY_URL
+        uses https:// and the TLS certificate is valid.
+        """
         return f"http://127.0.0.1:{self.gateway_port}"
 
     def invoke(self, message: str, session_id: Optional[str] = None) -> PiAgentResult:
