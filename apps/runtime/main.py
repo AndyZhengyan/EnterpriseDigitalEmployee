@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -140,7 +140,7 @@ async def execute_task(req: ExecuteRequest, request: Request) -> ExecuteResponse
             query = str(req.input)
 
         # 提取技能列表
-        available_skills: List[str] = []
+        available_skills: list[str] = []
         if req.context:
             available_skills = req.context.skills
 
@@ -170,8 +170,8 @@ async def execute_task(req: ExecuteRequest, request: Request) -> ExecuteResponse
 
         # 兼容处理返回结果
         answer = ""
-        sources: List[Any] = []
-        actions: List[Any] = []
+        sources: list[Any] = []
+        actions: list[Any] = []
         if isinstance(result, dict):
             answer = result.get("answer", "")
             sources = result.get("sources", [])
