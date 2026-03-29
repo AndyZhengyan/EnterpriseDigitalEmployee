@@ -246,7 +246,7 @@ class RuntimeExecutor:
             try:
                 # 构建调用 prompt
                 if step.type == "call_skill":
-                    skill_name = step.skill or step.skill
+                    skill_name = step.skill or ""
                     input_json = json_module.dumps(step.input, ensure_ascii=False)
                     framed_input = _framed_prompt(input_json, "skill_param")
                     prompt = f"执行技能：{skill_name}\n{framed_input}\n请调用该技能并返回结果。只返回结果，不要解释。"
