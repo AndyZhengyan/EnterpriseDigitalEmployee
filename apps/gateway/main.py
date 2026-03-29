@@ -16,8 +16,8 @@ from slowapi.errors import RateLimitExceeded as RateLimitExc
 from slowapi.util import get_remote_address
 
 from common.errors import EAgentError, ErrorCode
-from common.models import BaseResponse, Channel, Priority, TaskStatus, TaskType
-from common.tracing import configure_logging, get_logger, new_trace_id, trace_context
+from common.models import BaseResponse, Priority, TaskStatus, TaskType
+from common.tracing import configure_logging, get_logger, new_trace_id
 
 # 配置日志
 configure_logging()
@@ -60,8 +60,10 @@ app = FastAPI(
 
 # ============== 请求/响应模型 ==============
 
+
 class DispatchRequest(BaseModel):
     """任务分发请求"""
+
     employee_id: str = Field(..., description="Agent ID")
     task_type: TaskType = Field(default=TaskType.INQUIRY)
     content: str = Field(..., description="任务内容")
@@ -75,6 +77,7 @@ class DispatchRequest(BaseModel):
 
 class DispatchResponse(BaseModel):
     """任务分发响应"""
+
     task_id: str
     status: TaskStatus
     estimated_duration_ms: int = 5000
@@ -83,12 +86,14 @@ class DispatchResponse(BaseModel):
 
 class CallbackRequest(BaseModel):
     """Webhook 回调请求"""
+
     event_type: str  # task.completed | task.failed
     task_id: str
     result: Optional[Dict[str, Any]] = None
 
 
 # ============== 辅助函数 ==============
+
 
 async def _dispatch_to_runtime(request: DispatchRequest, trace_id: str) -> DispatchResponse:
     """将请求分发到 Runtime"""
@@ -102,6 +107,7 @@ async def _dispatch_to_runtime(request: DispatchRequest, trace_id: str) -> Dispa
 
 
 # ============== 路由 ==============
+
 
 @app.post("/gateway/dispatch", response_model=DispatchResponse)
 @limiter.limit("60/minute")
@@ -222,7 +228,6 @@ async def rate_limit_handler(request: Request, exc: RateLimitExc):
         ).model_dump(),
     )
 
-
 @app.exception_handler(EAgentError)
 async def eagent_error_handler(request: Request, exc: EAgentError):
     """统一异常处理"""
@@ -259,4 +264,5 @@ async def general_error_handler(request: Request, exc: Exception):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

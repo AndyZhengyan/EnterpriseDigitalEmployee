@@ -11,11 +11,12 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-
 # ============== 枚举定义 ==============
+
 
 class TaskType(str, Enum):
     """任务类型"""
+
     INQUIRY = "inquiry"
     ACTION = "action"
     ANALYSIS = "analysis"
@@ -23,6 +24,7 @@ class TaskType(str, Enum):
 
 class TaskStatus(str, Enum):
     """任务状态"""
+
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -33,6 +35,7 @@ class TaskStatus(str, Enum):
 
 class StepType(str, Enum):
     """步骤类型"""
+
     CALL_SKILL = "call_skill"
     CALL_CONNECTOR = "call_connector"
     CALL_MODEL = "call_model"
@@ -42,6 +45,7 @@ class StepType(str, Enum):
 
 class StepStatus(str, Enum):
     """步骤状态"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -51,14 +55,17 @@ class StepStatus(str, Enum):
 
 # ============== Execute 接口 ==============
 
+
 class TaskInput(BaseModel):
     """任务输入"""
+
     query: str
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
 class TaskContext(BaseModel):
     """任务上下文"""
+
     session_id: str
     user_id: str
     skills: List[str] = Field(default_factory=list)
@@ -67,6 +74,7 @@ class TaskContext(BaseModel):
 
 class ExecuteRequest(BaseModel):
     """POST /runtime/execute 请求"""
+
     employee_id: str
     task_id: Optional[str] = None
     task_type: TaskType = TaskType.INQUIRY
@@ -78,6 +86,7 @@ class ExecuteRequest(BaseModel):
 
 class TaskResult(BaseModel):
     """任务结果"""
+
     answer: Optional[str] = None
     sources: List[str] = Field(default_factory=list)
     actions: List[Dict[str, Any]] = Field(default_factory=list)
@@ -86,6 +95,7 @@ class TaskResult(BaseModel):
 
 class ExecuteResponse(BaseModel):
     """POST /runtime/execute 响应"""
+
     task_id: str
     status: TaskStatus
     result: Optional[TaskResult] = None
@@ -97,8 +107,10 @@ class ExecuteResponse(BaseModel):
 
 # ============== Plan 接口 ==============
 
+
 class PlanRequest(BaseModel):
     """POST /runtime/plan 请求"""
+
     employee_id: str
     task: str
     available_skills: List[str] = Field(default_factory=list)
@@ -107,6 +119,7 @@ class PlanRequest(BaseModel):
 
 class PlanStep(BaseModel):
     """计划步骤"""
+
     order: int
     type: StepType
     skill: Optional[str] = None
@@ -119,6 +132,7 @@ class PlanStep(BaseModel):
 
 class PlanResponse(BaseModel):
     """POST /runtime/plan 响应"""
+
     plan_id: str
     task_id: str
     steps: List[PlanStep]
@@ -129,8 +143,10 @@ class PlanResponse(BaseModel):
 
 # ============== Status 接口 ==============
 
+
 class StepInfo(BaseModel):
     """步骤信息"""
+
     order: int
     type: str
     status: StepStatus
@@ -143,6 +159,7 @@ class StepInfo(BaseModel):
 
 class StatusResponse(BaseModel):
     """GET /runtime/status/{task_id} 响应"""
+
     task_id: str
     status: TaskStatus
     current_step: int = 0
@@ -158,8 +175,10 @@ class StatusResponse(BaseModel):
 
 # ============== Cancel 接口 ==============
 
+
 class CancelResponse(BaseModel):
     """POST /runtime/cancel/{task_id} 响应"""
+
     task_id: str
     status: TaskStatus
     cancelled_at: datetime = Field(default_factory=datetime.utcnow)
@@ -170,8 +189,10 @@ class CancelResponse(BaseModel):
 
 # ============== Health 接口 ==============
 
+
 class HealthResponse(BaseModel):
     """GET /runtime/health 响应"""
+
     status: str  # healthy / degraded / unhealthy
     version: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)

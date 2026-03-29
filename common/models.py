@@ -5,32 +5,35 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
-
 # ============== 枚举定义 ==============
+
 
 class TaskType(str, Enum):
     """任务类型"""
-    INQUIRY = "inquiry"      # 查询类
-    ACTION = "action"        # 操作类
-    ANALYSIS = "analysis"    # 分析类
+
+    INQUIRY = "inquiry"  # 查询类
+    ACTION = "action"  # 操作类
+    ANALYSIS = "analysis"  # 分析类
 
 
 class TaskStatus(str, Enum):
     """任务状态"""
+
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    ESCALATED = "escalated"   # 升级人工
+    ESCALATED = "escalated"  # 升级人工
 
 
 class Priority(str, Enum):
     """任务优先级"""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -39,6 +42,7 @@ class Priority(str, Enum):
 
 class Channel(str, Enum):
     """请求渠道"""
+
     FEISHU = "feishu"
     WEBHOOK = "webhook"
     SCHEDULED = "scheduled"
@@ -47,6 +51,7 @@ class Channel(str, Enum):
 
 class RiskLevel(str, Enum):
     """风险等级"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -55,8 +60,10 @@ class RiskLevel(str, Enum):
 
 # ============== 基础模型 ==============
 
+
 class BaseResponse(BaseModel):
     """统一响应格式"""
+
     success: bool = True
     data: Any = None
     error: Optional[ErrorDetail] = None
@@ -64,9 +71,9 @@ class BaseResponse(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
-
 class ErrorDetail(BaseModel):
     """错误详情"""
+
     code: int
     message: str
     details: Optional[str] = None
@@ -77,8 +84,10 @@ class ErrorDetail(BaseModel):
 
 # ============== 任务模型 ==============
 
+
 class TaskContext(BaseModel):
     """任务上下文"""
+
     user_id: str
     session_id: str
     tenant_id: str
@@ -88,12 +97,14 @@ class TaskContext(BaseModel):
 
 class TaskInput(BaseModel):
     """任务输入"""
+
     query: str
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
 class Task(BaseModel):
     """任务"""
+
     id: str = Field(default_factory=lambda: f"task-{uuid.uuid4().hex[:12]}")
     employee_id: str
     source_channel: Channel
@@ -116,6 +127,7 @@ class Task(BaseModel):
 
 class TaskStep(BaseModel):
     """任务步骤"""
+
     id: str = Field(default_factory=lambda: f"step-{uuid.uuid4().hex[:12]}")
     task_id: str
     step_order: int
@@ -134,8 +146,10 @@ class TaskStep(BaseModel):
 
 # ============== Session 模型 ==============
 
+
 class Message(BaseModel):
     """会话消息"""
+
     role: str  # user / assistant / system
     content: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
@@ -143,6 +157,7 @@ class Message(BaseModel):
 
 class Session(BaseModel):
     """会话"""
+
     id: str = Field(default_factory=lambda: f"sess-{uuid.uuid4().hex[:12]}")
     employee_id: str
     user_id: str
@@ -155,8 +170,10 @@ class Session(BaseModel):
 
 # ============== AgentFamily 模型 ==============
 
+
 class AgentSoul(BaseModel):
     """Agent人格配置"""
+
     mbti: Optional[str] = None
     communication_style: str = "专业、简洁"
     risk_preference: str = "medium"  # low / medium / high
@@ -164,6 +181,7 @@ class AgentSoul(BaseModel):
 
 class AgentIdentity(BaseModel):
     """Agent身份配置"""
+
     role: str  # 岗位角色
     employee_id: str  # 工号
     feishu_id: Optional[str] = None
@@ -173,6 +191,7 @@ class AgentIdentity(BaseModel):
 
 class AgentConfig(BaseModel):
     """Agent工作配置"""
+
     responsibilities: List[str] = Field(default_factory=list)
     service_for: List[str] = Field(default_factory=list)
     boundaries: List[str] = Field(default_factory=list)
@@ -182,6 +201,7 @@ class AgentConfig(BaseModel):
 
 class AgentPolicy(BaseModel):
     """Agent治理策略"""
+
     skills: List[str] = Field(default_factory=list)
     tools: List[str] = Field(default_factory=list)
     approval_required: List[str] = Field(default_factory=list)
@@ -190,6 +210,7 @@ class AgentPolicy(BaseModel):
 
 class AgentFamily(BaseModel):
     """AgentFamily（岗位族）"""
+
     family_id: str
     family_name: str
     description: Optional[str] = None
@@ -204,8 +225,10 @@ class AgentFamily(BaseModel):
 
 # ============== Skill 模型 ==============
 
+
 class SkillCapability(BaseModel):
     """技能能力"""
+
     name: str
     description: str
     input_schema: Optional[Dict[str, Any]] = None
@@ -217,6 +240,7 @@ class SkillCapability(BaseModel):
 
 class Skill(BaseModel):
     """技能"""
+
     id: str
     name: str
     description: str
@@ -233,8 +257,10 @@ class Skill(BaseModel):
 
 # ============== Model 模型 ==============
 
+
 class ModelProvider(BaseModel):
     """模型提供商"""
+
     name: str
     endpoint: str
     api_key_env: str  # 环境变量名
@@ -244,6 +270,7 @@ class ModelProvider(BaseModel):
 
 class ModelUsage(BaseModel):
     """模型用量"""
+
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
@@ -251,6 +278,7 @@ class ModelUsage(BaseModel):
 
 class ModelCallResult(BaseModel):
     """模型调用结果"""
+
     content: Optional[str] = None
     model: str
     usage: ModelUsage
@@ -261,8 +289,10 @@ class ModelCallResult(BaseModel):
 
 # ============== Connector 模型 ==============
 
+
 class RetryPolicy(BaseModel):
     """重试策略"""
+
     max_retries: int = 2
     backoff_multiplier: float = 2.0
     initial_delay_ms: int = 100
@@ -270,6 +300,7 @@ class RetryPolicy(BaseModel):
 
 class ConnectorCapability(BaseModel):
     """连接器能力"""
+
     name: str
     description: str
     input_schema: Optional[Dict[str, Any]] = None
@@ -281,6 +312,7 @@ class ConnectorCapability(BaseModel):
 
 class Connector(BaseModel):
     """连接器"""
+
     id: str
     name: str
     type: str  # cli / mcp / api / db / cu

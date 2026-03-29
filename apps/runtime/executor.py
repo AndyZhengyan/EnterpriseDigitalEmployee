@@ -34,6 +34,7 @@ def _framed_prompt(content: str, role: str) -> str:
 
 class ExecutionState(enum.Enum):
     """执行状态"""
+
     IDLE = "idle"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -316,8 +317,8 @@ class RuntimeExecutor:
             f"剩余步骤：{remaining}\n"
             f"{framed_results}\n"
             f"请评估：\n"
-            f'1. 当前进度是否正常？\n'
-            f'2. 是否应该继续执行剩余步骤？\n'
+            f"1. 当前进度是否正常？\n"
+            f"2. 是否应该继续执行剩余步骤？\n"
             f"以 JSON 格式返回：\n"
             f'{{"continue": true/false, "reason": "<原因>", "assessment": "<评估>"}}\n'
             f"只返回 JSON。"
@@ -385,10 +386,12 @@ class RuntimeExecutor:
                 try:
                     # Act
                     result = await self.execute_step(step)
-                    self.step_results.append({
-                        "order": step.order,
-                        "result": result,
-                    })
+                    self.step_results.append(
+                        {
+                            "order": step.order,
+                            "result": result,
+                        }
+                    )
 
                     # Reflect
                     reflect_decision = await self.reflect(
@@ -410,10 +413,12 @@ class RuntimeExecutor:
                             step,
                             retries=max_retries - 1,
                         )
-                        self.step_results.append({
-                            "order": step.order,
-                            "result": result,
-                        })
+                        self.step_results.append(
+                            {
+                                "order": step.order,
+                                "result": result,
+                            }
+                        )
                     else:
                         # 重试耗尽
                         if self.retry_config.get("enable_escalation", True):
@@ -424,11 +429,13 @@ class RuntimeExecutor:
 
             # 3. 完成
             if self.state == ExecutionState.RUNNING:
-                self.complete({
-                    "answer": self._build_answer(),
-                    "sources": [],
-                    "actions": [],
-                })
+                self.complete(
+                    {
+                        "answer": self._build_answer(),
+                        "sources": [],
+                        "actions": [],
+                    }
+                )
 
         except Exception as e:
             self.fail(str(e))

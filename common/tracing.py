@@ -11,11 +11,9 @@ from __future__ import annotations
 import contextvars
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 import structlog
-
 
 # ============== Trace Context ==============
 
@@ -71,6 +69,7 @@ def trace_context(
 
 # ============== Structlog 配置 ==============
 
+
 def configure_logging(log_level: str = "INFO") -> None:
     """配置 structlog"""
 
@@ -92,6 +91,7 @@ def configure_logging(log_level: str = "INFO") -> None:
 
 
 # ============== 日志器工厂 ==============
+
 
 def get_logger(name: Optional[str] = None, **kwargs: Any):
     """
@@ -130,8 +130,10 @@ def get_logger(name: Optional[str] = None, **kwargs: Any):
 
 # ============== 便捷日志装饰器 ==============
 
+
 def log_entry_exit(logger: Any = None):
     """记录函数入口出口的装饰器"""
+
     def decorator(func):
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             log = logger or get_logger(func.__module__)
@@ -143,5 +145,7 @@ def log_entry_exit(logger: Any = None):
             except Exception as e:
                 log.error("exception", function=func.__name__, error=str(e))
                 raise
+
         return wrapper
+
     return decorator

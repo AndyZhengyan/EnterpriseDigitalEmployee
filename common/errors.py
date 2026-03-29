@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any
+from typing import Any, Dict, Optional
 
 
 class ErrorCode(Enum):
@@ -117,6 +117,7 @@ class EAgentError(Exception):
 
 # ========== 网关层异常 ==========
 
+
 class GatewayAuthError(EAgentError):
     def __init__(self, details: Optional[str] = None):
         super().__init__(ErrorCode.GATEWAY_AUTH_FAILED, details=details)
@@ -138,6 +139,7 @@ class GatewayCircuitOpenError(EAgentError):
 
 
 # ========== 运行时层异常 ==========
+
 
 class RuntimeTaskNotFoundError(EAgentError):
     def __init__(self, task_id: str):
@@ -166,6 +168,7 @@ class RuntimeEscalatedError(EAgentError):
 
 # ========== 模型层异常 ==========
 
+
 class ModelProviderError(EAgentError):
     def __init__(self, details: Optional[str] = None):
         super().__init__(ErrorCode.MODEL_PROVIDER_ERROR, details=details)
@@ -187,6 +190,7 @@ class ModelRoutingError(EAgentError):
 
 
 # ========== 连接器层异常 ==========
+
 
 class ConnectorNotFoundError(EAgentError):
     def __init__(self, connector_id: str):

@@ -173,8 +173,8 @@ class MemoryManager:
         other_messages = [m for m in ctx.messages if m.role != "system"]
 
         # 保留最近的消息
-        recent = other_messages[-self.max_recent_messages:]
-        older = other_messages[:-self.max_recent_messages]
+        recent = other_messages[-self.max_recent_messages :]
+        older = other_messages[: -self.max_recent_messages]
 
         # 摘要旧消息
         summary_content = self._summarize_messages(older)

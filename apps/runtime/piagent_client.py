@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -24,6 +23,7 @@ logger = structlog.get_logger("runtime.piagent")
 
 
 # ============== 错误定义 ==============
+
 
 class PiAgentError(Exception):
     """PiAgent 调用错误"""
@@ -36,19 +36,23 @@ class PiAgentError(Exception):
 
 class PiAgentTimeoutError(PiAgentError):
     """PiAgent 调用超时"""
+
     pass
 
 
 class PiAgentAuthError(PiAgentError):
     """PiAgent 认证失败"""
+
     pass
 
 
 # ============== 结果模型 ==============
 
+
 @dataclass
 class PiAgentResult:
     """PiAgent 执行结果"""
+
     run_id: str
     status: str  # ok | error
     summary: str
@@ -91,6 +95,7 @@ class PiAgentResult:
 
 # ============== PiAgent 客户端 ==============
 
+
 class PiAgentClient:
     """
     PiAgent 客户端。
@@ -112,6 +117,7 @@ class PiAgentClient:
     def _get_token(cls) -> str:
         """从环境变量或配置文件读取 Gateway token"""
         import os
+
         token = os.environ.get("OPENCLAW_GATEWAY_TOKEN")
         if token:
             return token
@@ -154,12 +160,17 @@ class PiAgentClient:
     def _build_cli_args(self, message: str, session_id: Optional[str] = None) -> List[str]:
         """构建 openclaw agent CLI 参数"""
         args = [
-            "openclaw", "agent",
-            "--agent", self.agent_id,
-            "--message", message,
+            "openclaw",
+            "agent",
+            "--agent",
+            self.agent_id,
+            "--message",
+            message,
             "--json",
-            "--thinking", self.thinking_level,
-            "--timeout", str(self.timeout_seconds),
+            "--thinking",
+            self.thinking_level,
+            "--timeout",
+            str(self.timeout_seconds),
         ]
         if session_id:
             args.extend(["--session-id", session_id])
@@ -301,6 +312,7 @@ class PiAgentClient:
 
 # ============== 会话管理器 ==============
 
+
 class PiAgentSession:
     """
     PiAgent 会话。
@@ -318,6 +330,7 @@ class PiAgentSession:
     def _new_session_id() -> str:
         """生成新的会话 ID"""
         import uuid
+
         return str(uuid.uuid4())
 
     def send(self, message: str) -> PiAgentResult:
