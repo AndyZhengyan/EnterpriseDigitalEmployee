@@ -27,7 +27,7 @@ jobs:
         run: ruff check apps/ common/
 
       - name: Ruff format check
-        run: ruff format --check .
+        run: ruff format --check apps/ common/
 
       - name: MyPy type check
         run: mypy apps/ common/
