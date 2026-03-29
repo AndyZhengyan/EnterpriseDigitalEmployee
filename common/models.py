@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 # ============== 枚举定义 ==============
 
@@ -68,7 +73,7 @@ class BaseResponse(BaseModel):
     data: Any = None
     error: Optional[ErrorDetail] = None
     trace_id: str = Field(default_factory=lambda: f"trace-{uuid.uuid4().hex[:16]}")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class ErrorDetail(BaseModel):
@@ -117,7 +122,7 @@ class Task(BaseModel):
     context: Optional[TaskContext] = None
     callback_url: Optional[str] = None
     trace_id: str = Field(default_factory=lambda: f"trace-{uuid.uuid4().hex[:16]}")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     duration_ms: Optional[int] = None
@@ -152,7 +157,7 @@ class Message(BaseModel):
 
     role: str  # user / assistant / system
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
 
 
 class Session(BaseModel):
@@ -164,8 +169,8 @@ class Session(BaseModel):
     tenant_id: str
     messages: List[Message] = Field(default_factory=list)
     working_context: Dict[str, Any] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
 
 # ============== AgentFamily 模型 ==============
@@ -219,8 +224,8 @@ class AgentFamily(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     policy: AgentPolicy = Field(default_factory=AgentPolicy)
     version: str = "1.0"
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
 
 # ============== Skill 模型 ==============
@@ -249,8 +254,8 @@ class Skill(BaseModel):
     capabilities: List[SkillCapability] = Field(default_factory=list)
     agent_families: List[str] = Field(default_factory=list)  # 绑定的AgentFamily
     status: str = "draft"  # draft / testing / staging / published / deprecated
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utc_now)
+    updated_at: datetime = Field(default_factory=_utc_now)
 
     model_config = {"use_enum_values": True}
 

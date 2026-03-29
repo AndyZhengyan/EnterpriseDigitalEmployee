@@ -11,9 +11,13 @@ import enum
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import structlog
+
 from apps.runtime.models import PlanStep, TaskResult
 
-from .piagent_client import PiAgentClient, PiAgentError
+from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
+
+logger = structlog.get_logger("runtime.executor")
 
 # ============== Prompt injection mitigation ==============
 
@@ -271,6 +275,17 @@ class RuntimeExecutor:
                     "run_id": result.run_id,
                 }
 
+            except asyncio.TimeoutError:
+                last_error = PiAgentTimeoutError(
+                    f"Step execution timed out after {self.timeout_seconds}s",
+                    agent_id=self.agent_id,
+                )
+                if attempt < max_retries:
+                    await asyncio.sleep(delay_ms / 1000.0)
+                    delay_ms = int(delay_ms * self.retry_config["backoff_multiplier"])
+                continue
+            except (KeyboardInterrupt, asyncio.CancelledError, SystemExit):
+                raise
             except PiAgentError as e:
                 last_error = e
                 if attempt < max_retries:
@@ -317,10 +332,14 @@ class RuntimeExecutor:
         )
 
         loop = asyncio.get_event_loop()
-        result = await asyncio.wait_for(
-            loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-            timeout=self.timeout_seconds,
-        )
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                timeout=self.timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("reflect_timeout", timeout_s=self.timeout_seconds)
+            return {"continue": remaining > 0, "reason": "Reflection timed out", "assessment": "Timeout"}
 
         if not result.text:
             return {"continue": remaining > 0, "reason": "No reflection response", "assessment": "Unknown"}
