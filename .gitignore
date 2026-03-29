@@ -52,3 +52,6 @@ config/
 secrets.yaml
 secrets.json
 credentials.*
+
+# Git worktrees (isolated workspaces)
+.worktrees/
