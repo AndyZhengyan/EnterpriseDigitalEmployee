@@ -9,14 +9,14 @@ from __future__ import annotations
 import asyncio
 import enum
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from apps.runtime.models import PlanStep, TaskResult
 
-from .piagent_client import PiAgentClient, PiAgentError, PiAgentResult, PiAgentTimeoutError
-
+from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
 
 # ============== Prompt injection mitigation ==============
+
 
 def _framed_prompt(content: str, role: str) -> str:
     """Wrap untrusted content in XML delimiters to reduce prompt injection risk.
@@ -249,20 +249,12 @@ class RuntimeExecutor:
                     skill_name = step.skill or step.skill
                     input_json = json_module.dumps(step.input, ensure_ascii=False)
                     framed_input = _framed_prompt(input_json, "skill_param")
-                    prompt = (
-                        f"执行技能：{skill_name}\n"
-                        f"{framed_input}\n"
-                        f"请调用该技能并返回结果。只返回结果，不要解释。"
-                    )
+                    prompt = f"执行技能：{skill_name}\n{framed_input}\n请调用该技能并返回结果。只返回结果，不要解释。"
                 elif step.type == "call_connector":
                     connector_name = step.connector or ""
                     input_json = json_module.dumps(step.input, ensure_ascii=False)
                     framed_input = _framed_prompt(input_json, "connector_param")
-                    prompt = (
-                        f"执行连接器：{connector_name}\n"
-                        f"{framed_input}\n"
-                        f"请执行并返回结果。"
-                    )
+                    prompt = f"执行连接器：{connector_name}\n{framed_input}\n请执行并返回结果。"
                 else:
                     prompt = f"执行步骤：{step.type}\n输入：{json_module.dumps(step.input, ensure_ascii=False)}"
 

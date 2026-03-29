@@ -128,8 +128,7 @@ class PiAgentClient:
                 return cfg.get("gateway", {}).get("auth", {}).get("token", "")
         except FileNotFoundError:
             raise PiAgentError(
-                f"OpenClaw config not found at {config_path}. "
-                "Run `openclaw gateway init` to configure.",
+                f"OpenClaw config not found at {config_path}. Run `openclaw gateway init` to configure.",
                 agent_id=None,
             )
         except json.JSONDecodeError as e:

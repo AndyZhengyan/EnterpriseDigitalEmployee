@@ -7,11 +7,11 @@ import secrets
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
-from slowapi import Limiter, RateLimitExceeded
+from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded as RateLimitExc
 from slowapi.util import get_remote_address
 
@@ -159,7 +159,7 @@ async def webhook_callback(req: CallbackRequest, request: Request):
             status_code=401,
             content=BaseResponse(
                 success=False,
-                error=ErrorCode.GATEWAY_AUTH_FAILED.to_dict(details="Invalid webhook secret"),
+                error=ErrorDetail(**ErrorCode.GATEWAY_AUTH_FAILED.to_dict(details="Invalid webhook secret")),
             ).model_dump(),
         )
     trace_id = new_trace_id()
@@ -217,6 +217,7 @@ async def health_check():
 
 # ============== 异常处理 ==============
 
+
 @app.exception_handler(RateLimitExc)
 async def rate_limit_handler(request: Request, exc: RateLimitExc):
     """Rate limit exceeded handler"""
@@ -224,9 +225,12 @@ async def rate_limit_handler(request: Request, exc: RateLimitExc):
         status_code=429,
         content=BaseResponse(
             success=False,
-            error=ErrorCode.GATEWAY_RATE_LIMITED.to_dict(details="Rate limit exceeded. Retry after 1 minute."),
+            error=ErrorDetail(
+                **ErrorCode.GATEWAY_RATE_LIMITED.to_dict(details="Rate limit exceeded. Retry after 1 minute.")
+            ),
         ).model_dump(),
     )
+
 
 @app.exception_handler(EAgentError)
 async def eagent_error_handler(request: Request, exc: EAgentError):
