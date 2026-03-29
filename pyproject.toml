@@ -29,6 +29,9 @@ dev = [
     "pip-audit>=0.1.0",
 ]
 
+[tool.setuptools]
+packages = ["apps", "common"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"
