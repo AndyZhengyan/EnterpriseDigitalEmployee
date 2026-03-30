@@ -2,7 +2,7 @@
 name = "e-agent-os"
 version = "0.1.0"
 description = "Enterprise Agent Operating System"
-requires-python = ">=3.9"
+requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
@@ -16,6 +16,8 @@ dependencies = [
     "opentelemetry-sdk>=1.28.0",
     "opentelemetry-instrumentation-fastapi>=0.49b0",
     "slowapi>=0.1.9",
+    "websockets>=14.0",
+    "cryptography>=42.0.0",
 ]
 
 [project.optional-dependencies]
@@ -34,14 +36,14 @@ packages = ["apps", "common"]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N"]
 ignore = []
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.13"
 strict = false
 warn_return_any = false
 warn_unused_ignores = true

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from apps.runtime.models import PlanStep, TaskResult
 
-from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
+from .piagent_client import PiAgentClient, PiAgentError
 
 # ============== Prompt injection mitigation ==============
 
@@ -183,7 +183,7 @@ class RuntimeExecutor:
                 timeout=self.timeout_seconds,
             )
         except asyncio.TimeoutError:
-            raise PiAgentTimeoutError(
+            raise PiAgentError(
                 f"Plan generation timed out after {self.timeout_seconds}s",
                 agent_id=self.agent_id,
             )

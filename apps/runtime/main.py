@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -23,7 +23,6 @@ from apps.runtime.models import (
     PlanRequest,
     PlanResponse,
     StatusResponse,
-    StepInfo,
     TaskInput,
     TaskResult,
     TaskStatus,
@@ -141,23 +140,22 @@ async def execute_task(req: ExecuteRequest, request: Request) -> ExecuteResponse
             query = str(req.input)
 
         # 提取技能列表
-        available_skills = []
-        if req.context and "skills" in req.context:
-            available_skills = req.context["skills"]
+        available_skills: List[str] = []
+        if req.context:
+            available_skills = req.context.skills
 
         import asyncio
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FUTimeoutError
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as FUTimeoutError
 
         loop = asyncio.get_event_loop()
         # 这里为了演示简单使用同步等待。实际生产中应该使用 background tasks
         with ThreadPoolExecutor(max_workers=1) as pool:
             try:
                 # 调用 executor.run(task_content, available_skills)
-                result = pool.submit(
-                    lambda: loop.run_until_complete(
-                        executor.run(query, available_skills)
-                    )
-                ).result(timeout=30)
+                result = pool.submit(lambda: loop.run_until_complete(executor.run(query, available_skills))).result(
+                    timeout=30
+                )
             except FUTimeoutError:
                 _update_task(task_id, status="failed")
                 return ExecuteResponse(
@@ -172,8 +170,8 @@ async def execute_task(req: ExecuteRequest, request: Request) -> ExecuteResponse
 
         # 兼容处理返回结果
         answer = ""
-        sources = []
-        actions = []
+        sources: List[Any] = []
+        actions: List[Any] = []
         if isinstance(result, dict):
             answer = result.get("answer", "")
             sources = result.get("sources", [])
@@ -275,4 +273,5 @@ async def cancel_task(task_id: str, request: Request) -> CancelResponse:
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("apps.runtime.main:app", host="0.0.0.0", port=8001, reload=True)
