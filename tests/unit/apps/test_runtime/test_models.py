@@ -3,18 +3,16 @@
 测试依据：specs/runtime-spec.md
 """
 
-import pytest
-
 from apps.runtime.models import (
+    CancelResponse,
     ExecuteRequest,
     ExecuteResponse,
+    HealthResponse,
     PlanRequest,
     PlanResponse,
     PlanStep,
     StatusResponse,
     StepStatus,
-    CancelResponse,
-    HealthResponse,
 )
 
 

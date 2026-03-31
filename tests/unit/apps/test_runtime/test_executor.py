@@ -4,11 +4,12 @@
 Plan → Act → Reflect 执行循环
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-from apps.runtime.executor import RuntimeExecutor, ExecutionState
-from apps.runtime.models import PlanStep, StepStatus
+import pytest
+
+from apps.runtime.executor import ExecutionState, RuntimeExecutor
+from apps.runtime.models import PlanStep
 
 
 class TestRuntimeExecutor:
@@ -113,8 +114,13 @@ class TestPlanPhase:
         mock_plan = {
             "plan_id": "plan-xxx",
             "steps": [
-                {"order": 1, "type": "call_skill", "skill": "skill-search",
-                 "input": {"query": "test"}, "expected_output": "results"}
+                {
+                    "order": 1,
+                    "type": "call_skill",
+                    "skill": "skill-search",
+                    "input": {"query": "test"},
+                    "expected_output": "results",
+                }
             ],
             "confidence": 0.9,
         }
@@ -140,10 +146,14 @@ class TestPlanPhase:
         mock_plan = {
             "plan_id": "plan-xxx",
             "steps": [
-                {"order": 1, "type": "call_skill", "skill": "skill-ticket",
-                 "input": {}, "expected_output": "tickets"},
-                {"order": 2, "type": "call_skill", "skill": "skill-summary",
-                 "input": {"data": "${step1}"}, "expected_output": "summary"},
+                {"order": 1, "type": "call_skill", "skill": "skill-ticket", "input": {}, "expected_output": "tickets"},
+                {
+                    "order": 2,
+                    "type": "call_skill",
+                    "skill": "skill-summary",
+                    "input": {"data": "${step1}"},
+                    "expected_output": "summary",
+                },
             ],
             "confidence": 0.85,
         }
@@ -175,10 +185,12 @@ class TestActPhase:
             input={"query": "今日工单"},
         )
 
-        executor.execute_step = AsyncMock(return_value={
-            "status": "success",
-            "output": {"results": ["ticket-1", "ticket-2"]},
-        })
+        executor.execute_step = AsyncMock(
+            return_value={
+                "status": "success",
+                "output": {"results": ["ticket-1", "ticket-2"]},
+            }
+        )
 
         result = await executor.execute_step(step)
 
@@ -200,9 +212,7 @@ class TestActPhase:
             input={},
         )
 
-        executor.execute_step = AsyncMock(
-            side_effect=Exception("Skill not found")
-        )
+        executor.execute_step = AsyncMock(side_effect=Exception("Skill not found"))
 
         with pytest.raises(Exception) as exc_info:
             await executor.execute_step(step)
@@ -220,11 +230,13 @@ class TestReflectPhase:
             task_id="task-xxx",
         )
 
-        executor.reflect = AsyncMock(return_value={
-            "continue": True,
-            "reason": "More steps needed",
-            "assessment": "Partial success",
-        })
+        executor.reflect = AsyncMock(
+            return_value={
+                "continue": True,
+                "reason": "More steps needed",
+                "assessment": "Partial success",
+            }
+        )
 
         decision = await executor.reflect(
             step_results=[{"status": "success"}],
@@ -242,11 +254,13 @@ class TestReflectPhase:
             task_id="task-xxx",
         )
 
-        executor.reflect = AsyncMock(return_value={
-            "continue": False,
-            "reason": "Task completed",
-            "assessment": "All steps successful",
-        })
+        executor.reflect = AsyncMock(
+            return_value={
+                "continue": False,
+                "reason": "Task completed",
+                "assessment": "All steps successful",
+            }
+        )
 
         decision = await executor.reflect(
             step_results=[

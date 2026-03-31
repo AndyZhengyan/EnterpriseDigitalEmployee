@@ -6,7 +6,7 @@ Session Context 记忆压缩
 
 import pytest
 
-from apps.runtime.memory import SessionContext, Message, MemoryManager
+from apps.runtime.memory import MemoryManager, SessionContext
 
 
 class TestSessionContext:

@@ -1,18 +1,16 @@
-import pytest
-from fastapi.testclient import TestClient
-from apps.gateway.main import app
 from unittest.mock import patch
 
+from fastapi.testclient import TestClient
+
+from apps.gateway.main import app
+
 client = TestClient(app)
+
 
 def test_internal_error_does_not_disclose_details():
     """验证系统内部错误响应是否包含对外的脱敏消息而不是源码细节。"""
     headers = {"Authorization": "Bearer test-token"}
-    payload = {
-        "employee_id": "test-agent",
-        "content": "test payload",
-        "task_type": "inquiry"
-    }
+    payload = {"employee_id": "test-agent", "content": "test payload", "task_type": "inquiry"}
 
     # 使用 patch 让内部逻辑抛出异常，验证全局 handler 处理结果
     with patch("apps.gateway.main._dispatch_to_runtime") as mock_dispatch:

@@ -3,10 +3,9 @@
 import pytest
 from pydantic import ValidationError
 
-from common.errors import ErrorCode
 from common.models import (
-    AgentFamily,
     AgentConfig,
+    AgentFamily,
     AgentIdentity,
     AgentPolicy,
     AgentSoul,
@@ -27,8 +26,8 @@ from common.models import (
     TaskType,
 )
 
-
 # ============== Task 模型测试 ==============
+
 
 class TestTaskModel:
     def test_task_creation_defaults(self):
@@ -97,6 +96,7 @@ class TestTaskModel:
 
 # ============== TaskStep 模型测试 ==============
 
+
 class TestTaskStepModel:
     def test_task_step_creation(self):
         step = TaskStep(
@@ -125,6 +125,7 @@ class TestTaskStepModel:
 
 # ============== Session 模型测试 ==============
 
+
 class TestSessionModel:
     def test_session_creation(self):
         session = Session(
@@ -151,6 +152,7 @@ class TestSessionModel:
 
 
 # ============== AgentFamily 模型测试 ==============
+
 
 class TestAgentFamilyModel:
     def test_agent_family_minimal(self):
@@ -203,6 +205,7 @@ class TestAgentFamilyModel:
 
 # ============== Skill 模型测试 ==============
 
+
 class TestSkillModel:
     def test_skill_creation(self):
         skill = Skill(
@@ -232,6 +235,7 @@ class TestSkillModel:
 
 
 # ============== Connector 模型测试 ==============
+
 
 class TestConnectorModel:
     def test_connector_creation(self):
@@ -268,6 +272,7 @@ class TestConnectorModel:
 
 
 # ============== Model 用量测试 ==============
+
 
 class TestModelModels:
     def test_model_usage(self):

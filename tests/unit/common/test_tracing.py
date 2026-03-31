@@ -1,11 +1,10 @@
 """common.tracing 单元测试"""
 
-import pytest
 from common.tracing import (
+    get_logger,
     get_task_id,
     get_tenant_id,
     get_trace_id,
-    get_logger,
     new_trace_id,
     trace_context,
 )
@@ -37,7 +36,7 @@ class TestTraceId:
 
     def test_trace_context_nested(self):
         """嵌套 trace_context"""
-        with trace_context(trace_id="trace-outer") as outer_id:
+        with trace_context(trace_id="trace-outer") as _outer_id:
             assert get_trace_id() == "trace-outer"
             with trace_context(trace_id="trace-inner") as inner_id:
                 assert inner_id == "trace-inner"

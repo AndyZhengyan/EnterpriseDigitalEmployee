@@ -36,6 +36,20 @@ class OpenClawSettings(BaseSettings):
         case_sensitive = False
 
 
+class PiAgentSidecarConfig(BaseSettings):
+    """PiAgent Sidecar 配置"""
+
+    enabled: bool = False  # False=subprocess 模式, True=sidecar 模式
+    socket_path: str = "/tmp/piagent.sock"
+    startup_timeout_ms: int = 10_000
+    request_timeout_ms: int = 300_000
+    sidecar_script: Optional[str] = None
+
+    class Config:
+        env_prefix = "PIAGENT_SIDECAR_"
+        case_sensitive = False
+
+
 class RuntimeSettings(BaseSettings):
     """Runtime 模块全局配置"""
 
@@ -45,6 +59,7 @@ class RuntimeSettings(BaseSettings):
 
     # 子模块配置
     openclaw: OpenClawSettings = OpenClawSettings()
+    piagent_sidecar: PiAgentSidecarConfig = PiAgentSidecarConfig()
 
     class Config:
         env_prefix = "RUNTIME_"

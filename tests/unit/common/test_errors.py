@@ -1,20 +1,18 @@
 """common.errors 单元测试"""
 
-import pytest
-
 from common.errors import (
     ConnectorApprovalRequiredError,
     ConnectorExecutionError,
     ConnectorNotFoundError,
     ConnectorTimeoutError,
-    ErrorCode,
     EAgentError,
+    ErrorCode,
     GatewayAuthError,
     GatewayRateLimitError,
     GatewayTenantNotFoundError,
     ModelQuotaExceededError,
-    ModelTimeoutError,
     ModelRoutingError,
+    ModelTimeoutError,
     RuntimeEscalatedError,
     RuntimeExecutionError,
     RuntimePlanFailedError,

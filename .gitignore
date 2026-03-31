@@ -56,6 +56,10 @@ credentials.*
 # Git worktrees (isolated workspaces)
 .worktrees/
 
+# Node.js (sidecar)
+node_modules/
+package-lock.json
+
 # Probe/debug scripts with hardcoded tokens (security risk)
 scripts/probe_*.py
 scripts/traffic_proxy.py
