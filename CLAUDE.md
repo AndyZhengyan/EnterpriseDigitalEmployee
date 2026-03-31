@@ -84,9 +84,11 @@
 **需要用户确认的情况**（发现问题时再问，不要事前问）：
 
 - 需要删除或重写非自己创建的 commit
-- 需要修改 CI workflow 本身的逻辑
+- 对 CI workflow 结构的修改（新增 job、修改 trigger、新增 secret 等）；CI 依赖版本修正在例外范围内，直接修
 - 发现代码有逻辑 bug 而非风格问题（风格问题 AI 直接修）
 - 授权范围外的任何操作
+
+**例外：CI 依赖版本修正无需 PR review，直接推 ci/* 分支后创建 PR 合并**
 
 ## CI/CD
 
@@ -105,6 +107,7 @@
 
 ## Git 约定
 
+- **所有变更必须走 PR 合并到 main**，不允许直接 push main（含 config、CI、文档）
 - Commit message 格式: `type(scope): description` (Conventional Commits)
 - PR 分支命名: `ci/*`, `security/*`, `feat/*`, `fix/*`
 - 推送到 PR 分支时使用 `--force-with-lease`
