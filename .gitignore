@@ -55,3 +55,7 @@ credentials.*
 
 # Git worktrees (isolated workspaces)
 .worktrees/
+
+# Probe/debug scripts with hardcoded tokens (security risk)
+scripts/probe_*.py
+scripts/traffic_proxy.py
