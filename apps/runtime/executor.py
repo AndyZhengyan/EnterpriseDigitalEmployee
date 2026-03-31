@@ -9,11 +9,14 @@ from __future__ import annotations
 import asyncio
 import enum
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import structlog
 
 from apps.runtime.models import PlanStep, TaskResult
+from apps.runtime.piagent_sidecar_client import PiAgentSidecarClient
+from common.config import settings
 
 from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
 
@@ -93,6 +96,8 @@ class RuntimeExecutor:
         self.escalation_reason: Optional[str] = None
         self.started_at: Optional[datetime] = None
         self._piagent: Optional[PiAgentClient] = None
+        self._sidecar_client: Optional[PiAgentSidecarClient] = None
+        self._use_sidecar = retry_config.get("use_sidecar", False) if retry_config else False
         self._gateway_token = gateway_token
 
     @property
@@ -105,6 +110,18 @@ class RuntimeExecutor:
                 gateway_token=self._gateway_token,
             )
         return self._piagent
+
+    @property
+    def sidecar_client(self) -> PiAgentSidecarClient:
+        if self._sidecar_client is None:
+            cfg = settings.piagent_sidecar
+            self._sidecar_client = PiAgentSidecarClient(
+                socket_path=Path(cfg.socket_path),
+                startup_timeout=cfg.startup_timeout_ms / 1000,
+                request_timeout=cfg.request_timeout_ms / 1000,
+                sidecar_script=Path(cfg.sidecar_script) if cfg.sidecar_script else None,
+            )
+        return self._sidecar_client
 
     def start(self) -> None:
         """开始执行"""
@@ -191,23 +208,31 @@ class RuntimeExecutor:
             f"只返回 JSON，不要解释。"
         )
 
-        loop = asyncio.get_event_loop()
         try:
-            piagent_result = await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-                timeout=self.timeout_seconds,
-            )
+            if self._use_sidecar:
+                sidecar_result = await asyncio.wait_for(
+                    self.sidecar_client.invoke(prompt),
+                    timeout=self.timeout_seconds,
+                )
+                plan_text = sidecar_result.answer
+            else:
+                loop = asyncio.get_event_loop()
+                piagent_result = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                    timeout=self.timeout_seconds,
+                )
+                plan_text = piagent_result.text or ""
         except asyncio.TimeoutError:
             raise PiAgentError(
                 f"Plan generation timed out after {self.timeout_seconds}s",
                 agent_id=self.agent_id,
             )
 
-        if not piagent_result.text:
+        if not plan_text:
             raise PiAgentError("Empty response from PiAgent during plan generation", agent_id=self.agent_id)
 
         # 解析 JSON 计划
-        return self._parse_plan(piagent_result.text)
+        return self._parse_plan(plan_text)
 
     def _parse_plan(self, text: str) -> Dict[str, Any]:
         """从 Agent 输出中解析计划 JSON"""
@@ -273,18 +298,29 @@ class RuntimeExecutor:
                 else:
                     prompt = f"执行步骤：{step.type}\n输入：{json_module.dumps(step.input, ensure_ascii=False)}"
 
-                loop = asyncio.get_event_loop()
-                result = await asyncio.wait_for(
-                    loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-                    timeout=self.timeout_seconds,
-                )
-
-                return {
-                    "status": "success",
-                    "output": {"text": result.text, "raw": result.raw},
-                    "duration_ms": result.duration_ms,
-                    "run_id": result.run_id,
-                }
+                if self._use_sidecar:
+                    sidecar_result = await asyncio.wait_for(
+                        self.sidecar_client.invoke(prompt),
+                        timeout=self.timeout_seconds,
+                    )
+                    return {
+                        "status": "success",
+                        "output": {"text": sidecar_result.answer, "raw": None},
+                        "duration_ms": sidecar_result.duration_ms,
+                        "run_id": "",
+                    }
+                else:
+                    loop = asyncio.get_event_loop()
+                    pi_result = await asyncio.wait_for(
+                        loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                        timeout=self.timeout_seconds,
+                    )
+                    return {
+                        "status": "success",
+                        "output": {"text": pi_result.text, "raw": pi_result.raw},
+                        "duration_ms": pi_result.duration_ms,
+                        "run_id": pi_result.run_id,
+                    }
 
             except asyncio.TimeoutError:
                 last_error = PiAgentTimeoutError(
@@ -342,20 +378,28 @@ class RuntimeExecutor:
             f"只返回 JSON。"
         )
 
-        loop = asyncio.get_event_loop()
         try:
-            result = await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-                timeout=self.timeout_seconds,
-            )
+            if self._use_sidecar:
+                sidecar_result = await asyncio.wait_for(
+                    self.sidecar_client.invoke(prompt),
+                    timeout=self.timeout_seconds,
+                )
+                reflect_text = sidecar_result.answer
+            else:
+                loop = asyncio.get_event_loop()
+                pi_result = await asyncio.wait_for(
+                    loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                    timeout=self.timeout_seconds,
+                )
+                reflect_text = pi_result.text or ""
         except asyncio.TimeoutError:
             logger.warning("reflect_timeout", timeout_s=self.timeout_seconds)
             return {"continue": remaining > 0, "reason": "Reflection timed out", "assessment": "Timeout"}
 
-        if not result.text:
+        if not reflect_text:
             return {"continue": remaining > 0, "reason": "No reflection response", "assessment": "Unknown"}
 
-        return self._parse_reflect(result.text)
+        return self._parse_reflect(reflect_text)
 
     def _parse_reflect(self, text: str) -> Dict[str, Any]:
         """从 Agent 输出中解析反思 JSON"""
