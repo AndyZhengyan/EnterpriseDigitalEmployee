@@ -72,6 +72,28 @@ class TestTaskModel:
         assert TaskType.ACTION.value == "action"
         assert TaskType.ANALYSIS.value == "analysis"
 
+    def test_task_input_content_max_length(self):
+        """input_content 超过 max_length=10000 应被拒绝"""
+        long_content = "x" * 10001
+        with pytest.raises(ValidationError):
+            Task(
+                employee_id="agent-001",
+                source_channel="feishu",
+                task_type="inquiry",
+                input_content=long_content,
+            )
+
+    def test_task_input_content_at_limit(self):
+        """input_content 正好 10000 应通过"""
+        content = "x" * 10000
+        task = Task(
+            employee_id="agent-001",
+            source_channel="feishu",
+            task_type="inquiry",
+            input_content=content,
+        )
+        assert len(task.input_content) == 10000
+
 
 # ============== TaskStep 模型测试 ==============
 

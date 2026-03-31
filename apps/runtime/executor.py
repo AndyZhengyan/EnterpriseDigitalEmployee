@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import asyncio
 import enum
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+
+import structlog
 
 from apps.runtime.models import PlanStep, TaskResult
 
-from .piagent_client import PiAgentClient, PiAgentError
+from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
+
+logger = structlog.get_logger("runtime.executor")
 
 # ============== Prompt injection mitigation ==============
 
@@ -70,6 +74,8 @@ class RuntimeExecutor:
         gateway_token: Optional[str] = None,
         timeout_seconds: int = 300,
     ):
+        if not employee_id or not employee_id.strip():
+            raise ValueError("employee_id must be a non-empty string")
         self.employee_id = employee_id
         self.task_id = task_id
         self.agent_id = agent_id or self.AGENT_FOR_SIMPLE
@@ -103,7 +109,7 @@ class RuntimeExecutor:
     def start(self) -> None:
         """开始执行"""
         self.state = ExecutionState.RUNNING
-        self.started_at = datetime.utcnow()
+        self.started_at = datetime.now(timezone.utc)
 
     def complete(self, result: Dict[str, Any]) -> None:
         """标记完成"""
@@ -125,6 +131,15 @@ class RuntimeExecutor:
     def cancel(self) -> None:
         """取消执行"""
         self.state = ExecutionState.CANCELLED
+
+    def _build_answer(self) -> str:
+        """从 step_results 构建最终回答"""
+        if not self.step_results:
+            return ""
+        last_result = self.step_results[-1]
+        output = last_result.get("result", {}).get("output", {})
+        text = output.get("text", "")
+        return text or ""
 
     def _select_agent(self, task: str, available_skills: List[str]) -> str:
         """
@@ -246,7 +261,7 @@ class RuntimeExecutor:
             try:
                 # 构建调用 prompt
                 if step.type == "call_skill":
-                    skill_name = step.skill or ""
+                    skill_name = step.skill
                     input_json = json_module.dumps(step.input, ensure_ascii=False)
                     framed_input = _framed_prompt(input_json, "skill_param")
                     prompt = f"执行技能：{skill_name}\n{framed_input}\n请调用该技能并返回结果。只返回结果，不要解释。"
@@ -271,6 +286,17 @@ class RuntimeExecutor:
                     "run_id": result.run_id,
                 }
 
+            except asyncio.TimeoutError:
+                last_error = PiAgentTimeoutError(
+                    f"Step execution timed out after {self.timeout_seconds}s",
+                    agent_id=self.agent_id,
+                )
+                if attempt < max_retries:
+                    await asyncio.sleep(delay_ms / 1000.0)
+                    delay_ms = int(delay_ms * self.retry_config["backoff_multiplier"])
+                continue
+            except (KeyboardInterrupt, asyncio.CancelledError, SystemExit):
+                raise
             except PiAgentError as e:
                 last_error = e
                 if attempt < max_retries:
@@ -317,10 +343,14 @@ class RuntimeExecutor:
         )
 
         loop = asyncio.get_event_loop()
-        result = await asyncio.wait_for(
-            loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-            timeout=self.timeout_seconds,
-        )
+        try:
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+                timeout=self.timeout_seconds,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("reflect_timeout", timeout_s=self.timeout_seconds)
+            return {"continue": remaining > 0, "reason": "Reflection timed out", "assessment": "Timeout"}
 
         if not result.text:
             return {"continue": remaining > 0, "reason": "No reflection response", "assessment": "Unknown"}

@@ -5,11 +5,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+
+def _utc_now() -> datetime:
+    """Return current UTC time as timezone-aware datetime."""
+    return datetime.now(timezone.utc)
+
 
 # ============== 枚举定义 ==============
 
@@ -59,7 +65,7 @@ class StepStatus(str, Enum):
 class TaskInput(BaseModel):
     """任务输入"""
 
-    query: str
+    query: str = Field(..., max_length=10000)
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -181,7 +187,7 @@ class CancelResponse(BaseModel):
 
     task_id: str
     status: TaskStatus
-    cancelled_at: datetime = Field(default_factory=datetime.utcnow)
+    cancelled_at: datetime = Field(default_factory=_utc_now)
     reason: str = "user_requested"
 
     model_config = {"use_enum_values": True}
@@ -195,6 +201,6 @@ class HealthResponse(BaseModel):
 
     status: str  # healthy / degraded / unhealthy
     version: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=_utc_now)
     checks: Dict[str, str] = Field(default_factory=dict)
     stats: Dict[str, Any] = Field(default_factory=dict)

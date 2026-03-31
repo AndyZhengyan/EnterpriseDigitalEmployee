@@ -4,8 +4,6 @@
 Plan → Act → Reflect 执行循环
 """
 
-import concurrent.futures
-
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -25,6 +23,35 @@ class TestRuntimeExecutor:
         assert executor.employee_id == "agent-001"
         assert executor.task_id == "task-xxx"
         assert executor.state == ExecutionState.IDLE
+
+    def test_executor_initialization_empty_employee_id(self):
+        """employee_id 为空时应抛出 ValueError"""
+        with pytest.raises(ValueError, match="non-empty"):
+            RuntimeExecutor(employee_id="", task_id="task-xxx")
+        with pytest.raises(ValueError, match="non-empty"):
+            RuntimeExecutor(employee_id="   ", task_id="task-xxx")
+
+    def test_build_answer_empty_results(self):
+        """无步骤结果时返回空字符串"""
+        executor = RuntimeExecutor(employee_id="agent-001", task_id="task-xxx")
+        assert executor._build_answer() == ""
+
+    def test_build_answer_returns_last_text(self):
+        """返回最后一步的文本输出"""
+        executor = RuntimeExecutor(employee_id="agent-001", task_id="task-xxx")
+        executor.step_results = [
+            {"order": 1, "result": {"output": {"text": "first"}}},
+            {"order": 2, "result": {"output": {"text": "final answer"}}},
+        ]
+        assert executor._build_answer() == "final answer"
+
+    def test_build_answer_missing_text(self):
+        """最后一步无 text 字段时返回空"""
+        executor = RuntimeExecutor(employee_id="agent-001", task_id="task-xxx")
+        executor.step_results = [
+            {"order": 1, "result": {"output": {}}},
+        ]
+        assert executor._build_answer() == ""
 
     def test_executor_state_transitions(self):
         """状态转换"""

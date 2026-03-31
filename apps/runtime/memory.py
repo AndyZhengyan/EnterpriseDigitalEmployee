@@ -6,8 +6,9 @@ Session Context 与记忆压缩
 
 from __future__ import annotations
 
+import asyncio
 from collections import OrderedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 
@@ -17,7 +18,7 @@ class Message:
     def __init__(self, role: str, content: str):
         self.role = role  # user / assistant / system
         self.content = content
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(timezone.utc)
 
 
 class SessionContext:
@@ -51,20 +52,20 @@ class SessionContext:
         self.artifacts: List[Dict[str, Any]] = []
 
         # 元信息
-        self.created_at = datetime.utcnow()
-        self.last_active_at = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
+        self.last_active_at = datetime.now(timezone.utc)
         self.message_count = 0
 
     def add_message(self, role: str, content: str) -> None:
         """添加消息"""
         self.messages.append(Message(role, content))
         self.message_count += 1
-        self.last_active_at = datetime.utcnow()
+        self.last_active_at = datetime.now(timezone.utc)
 
     def set_memory(self, key: str, value: Any) -> None:
         """设置工作记忆"""
         self.working_memory[key] = value
-        self.last_active_at = datetime.utcnow()
+        self.last_active_at = datetime.now(timezone.utc)
 
     def get_memory(self, key: str, default: Any = None) -> Any:
         """获取工作记忆"""
@@ -106,8 +107,9 @@ class MemoryManager:
         self.compression_threshold = compression_threshold
         self.max_recent_messages = max_recent_messages
         self.sessions: OrderedDict[str, SessionContext] = OrderedDict()
+        self._lock = asyncio.Lock()
 
-    def get_or_create(
+    async def get_or_create(
         self,
         session_id: str,
         employee_id: str,
@@ -117,41 +119,44 @@ class MemoryManager:
         获取或创建会话。
 
         如果会话存在但需要压缩，会自动压缩。
+        使用 asyncio.Lock 保护并发访问。
         """
-        if session_id in self.sessions:
-            ctx = self.sessions[session_id]
-            # 移动到末尾（最新）
-            self.sessions.move_to_end(session_id)
-            # 检查是否需要压缩
-            if self.should_compress(ctx):
-                self.compress(ctx)
+        async with self._lock:
+            if session_id in self.sessions:
+                ctx = self.sessions[session_id]
+                # 移动到末尾（最新）
+                self.sessions.move_to_end(session_id)
+                # 检查是否需要压缩
+                if self.should_compress(ctx):
+                    self.compress(ctx)
+                return ctx
+
+            # 检查会话数量限制
+            if len(self.sessions) >= self.max_sessions:
+                # 删除最旧的会话
+                oldest_key = next(iter(self.sessions))
+                del self.sessions[oldest_key]
+
+            # 创建新会话
+            ctx = SessionContext(
+                session_id=session_id,
+                employee_id=employee_id,
+                user_id=user_id,
+            )
+            self.sessions[session_id] = ctx
             return ctx
 
-        # 检查会话数量限制
-        if len(self.sessions) >= self.max_sessions:
-            # 删除最旧的会话
-            oldest_key = next(iter(self.sessions))
-            del self.sessions[oldest_key]
-
-        # 创建新会话
-        ctx = SessionContext(
-            session_id=session_id,
-            employee_id=employee_id,
-            user_id=user_id,
-        )
-        self.sessions[session_id] = ctx
-        return ctx
-
     def get(self, session_id: str) -> Optional[SessionContext]:
-        """获取会话，不存在则返回 None"""
+        """获取会话，不存在则返回 None（无需锁，直接读取）"""
         return self.sessions.get(session_id)
 
-    def delete(self, session_id: str) -> bool:
+    async def delete(self, session_id: str) -> bool:
         """删除会话"""
-        if session_id in self.sessions:
-            del self.sessions[session_id]
-            return True
-        return False
+        async with self._lock:
+            if session_id in self.sessions:
+                del self.sessions[session_id]
+                return True
+            return False
 
     def should_compress(self, ctx: SessionContext) -> bool:
         """检查是否需要压缩"""
@@ -203,21 +208,22 @@ class MemoryManager:
 
         return "，".join(summary_parts) if summary_parts else ""
 
-    def cleanup_expired(self, ttl_hours: int = 24) -> int:
+    async def cleanup_expired(self, ttl_hours: int = 24) -> int:
         """
         清理过期的会话。
 
         返回清理的会话数量。
         """
-        now = datetime.utcnow()
-        expired_keys = []
+        async with self._lock:
+            now = datetime.now(timezone.utc)
+            expired_keys = []
 
-        for session_id, ctx in self.sessions.items():
-            age_hours = (now - ctx.last_active_at).total_seconds() / 3600
-            if age_hours > ttl_hours:
-                expired_keys.append(session_id)
+            for session_id, ctx in self.sessions.items():
+                age_hours = (now - ctx.last_active_at).total_seconds() / 3600
+                if age_hours > ttl_hours:
+                    expired_keys.append(session_id)
 
-        for key in expired_keys:
-            del self.sessions[key]
+            for key in expired_keys:
+                del self.sessions[key]
 
-        return len(expired_keys)
+            return len(expired_keys)

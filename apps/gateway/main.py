@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import os
 import secrets
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded as RateLimitExc
 from slowapi.util import get_remote_address
@@ -66,13 +66,26 @@ class DispatchRequest(BaseModel):
 
     employee_id: str = Field(..., description="Agent ID")
     task_type: TaskType = Field(default=TaskType.INQUIRY)
-    content: str = Field(..., description="任务内容")
+    content: str = Field(..., max_length=10000, description="任务内容")
     priority: Priority = Field(default=Priority.NORMAL)
     context: Dict[str, Any] = Field(default_factory=dict)
-    callback_url: Optional[str] = None
+    callback_url: Optional[str] = Field(default=None, description="回调 URL")
 
     class Config:
         use_enum_values = True
+
+    @field_validator("callback_url")
+    @classmethod
+    def validate_callback_url(cls, v: Optional[str]) -> Optional[str]:
+        """仅允许 HTTPS URL，防止 SSRF"""
+        if v is None:
+            return v
+        import urllib.parse
+
+        parsed = urllib.parse.urlparse(v)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("callback_url must use http or https scheme")
+        return v
 
 
 class DispatchResponse(BaseModel):
@@ -87,7 +100,7 @@ class DispatchResponse(BaseModel):
 class CallbackRequest(BaseModel):
     """Webhook 回调请求"""
 
-    event_type: str  # task.completed | task.failed
+    event_type: Literal["task.completed", "task.failed"]
     task_id: str
     result: Optional[Dict[str, Any]] = None
 
@@ -210,7 +223,7 @@ async def health_check():
         "status": "healthy",
         "service": "gateway",
         "version": "0.1.0",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "checks": {},
     }
 
