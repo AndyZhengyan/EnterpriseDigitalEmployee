@@ -22,7 +22,7 @@ export class SidecarSessionManager {
   private sessions = new Map<string, PooledSession>();
   private defaultSession?: AgentSession;
 
-  async getOrCreate(sessionId?: string): Promise<AgentSession> {
+  async getOrCreate(sessionId?: string, model?: ReturnType<typeof getModel>): Promise<AgentSession> {
     if (sessionId) {
       const pooled = this.sessions.get(sessionId);
       if (pooled) {
@@ -36,7 +36,7 @@ export class SidecarSessionManager {
       sessionManager: SessionManager.inMemory(),
       authStorage,
       modelRegistry: ModelRegistry.inMemory(authStorage),
-      model: DEFAULT_MODEL,
+      model: model ?? DEFAULT_MODEL,
     });
 
     if (sessionId) {
