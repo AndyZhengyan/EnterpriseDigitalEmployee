@@ -12,9 +12,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from apps.connector_hub.client import ConnectorHubClient
+from apps.knowledge_hub.client import KnowledgeHubClient
 from apps.model_hub.client import ModelHubClient
 from apps.runtime.models import PlanStep, TaskResult
 from apps.runtime.piagent_sidecar_client import PiAgentSidecarClient
+from apps.skill_hub.client import SkillHubClient
 from common.config import settings
 from common.tracing import get_logger
 
@@ -99,6 +102,7 @@ class RuntimeExecutor:
         self._sidecar_client: Optional[PiAgentSidecarClient] = None
         self._use_sidecar = retry_config.get("use_sidecar", False) if retry_config else False
         self._use_model_hub = retry_config.get("use_model_hub", False) if retry_config else False
+        self._use_knowledge_rag = retry_config.get("use_knowledge_rag", False) if retry_config else False
         self._gateway_token = gateway_token
 
     @property
@@ -126,7 +130,23 @@ class RuntimeExecutor:
 
     @property
     def model_hub_client(self) -> ModelHubClient:
+        """Lazy ModelHub singleton for unified model invocation (port 8002)."""
         return ModelHubClient.get_instance(base_url="http://127.0.0.1:8002", timeout=self.timeout_seconds)
+
+    @property
+    def skill_hub_client(self) -> SkillHubClient:
+        """Lazy SkillHub singleton for skill invocation (port 8004)."""
+        return SkillHubClient.get_instance(base_url="http://127.0.0.1:8004", timeout=self.timeout_seconds)
+
+    @property
+    def connector_hub_client(self) -> ConnectorHubClient:
+        """Lazy ConnectorHub singleton for connector invocation (port 8003)."""
+        return ConnectorHubClient.get_instance(base_url="http://127.0.0.1:8003", timeout=self.timeout_seconds)
+
+    @property
+    def knowledge_hub_client(self) -> KnowledgeHubClient:
+        """Lazy KnowledgeHub singleton for RAG context enrichment (port 8005)."""
+        return KnowledgeHubClient.get_instance(base_url="http://127.0.0.1:8005", timeout=self.timeout_seconds)
 
     def start(self) -> None:
         """开始执行"""
@@ -201,9 +221,29 @@ class RuntimeExecutor:
 
         skills_desc = ", ".join(available_skills) if available_skills else "（无可用技能）"
         user_task = _framed_prompt(task, "user")
+
+        # Optional: enrich with KnowledgeHub RAG context
+        rag_context = ""
+        if self._use_knowledge_rag:
+            try:
+                search_resp = await self.knowledge_hub_client.search(
+                    query=task,
+                    top_k=3,
+                    employee_id=self.employee_id,
+                )
+                if search_resp.results:
+                    docs = "\n\n".join(
+                        f"[{r.rank}] {r.document.title}: {r.document.content[:300]}" for r in search_resp.results
+                    )
+                    rag_context = f"\n\n相关知识库内容：\n{docs}\n"
+                    logger.info("knowledge_rag.enriched", task=task[:50], docs=len(search_resp.results))
+            except Exception as e:
+                logger.warning("knowledge_rag.failed", error=str(e))
+
         prompt = (
             f"你是一个任务规划专家。\n{user_task}\n"
             f"当前可用的技能：{skills_desc}\n"
+            f"{rag_context}"
             f"请将任务分解为明确的执行步骤（Plan）。\n"
             f"以 JSON 格式返回，格式如下：\n"
             f'{{"plan_id": "<唯一ID>", "steps": ['
@@ -302,11 +342,48 @@ class RuntimeExecutor:
                 # 构建调用 prompt
                 if step.type == "call_skill":
                     skill_name = step.skill
+                    if self._use_model_hub and skill_name:
+                        # Use SkillHub for skill invocation
+                        try:
+                            skill_resp = await self.skill_hub_client.invoke_skill(
+                                skill_id=skill_name,
+                                parameters=step.input,
+                                timeout_seconds=self.timeout_seconds,
+                                employee_id=self.employee_id,
+                            )
+                            return {
+                                "status": "success" if not skill_resp.error else "error",
+                                "output": {"text": str(skill_resp.result), "raw": skill_resp.model_dump()},
+                                "duration_ms": skill_resp.duration_ms,
+                                "run_id": "",
+                            }
+                        except Exception as e:
+                            logger.warning("skill_hub.invoke.failed", skill_id=skill_name, error=str(e))
+                            # Fall through to ModelHub proxy
                     input_json = json_module.dumps(step.input, ensure_ascii=False)
                     framed_input = _framed_prompt(input_json, "skill_param")
                     prompt = f"执行技能：{skill_name}\n{framed_input}\n请调用该技能并返回结果。只返回结果，不要解释。"
                 elif step.type == "call_connector":
                     connector_name = step.connector or ""
+                    if self._use_model_hub and connector_name:
+                        # Use ConnectorHub for connector invocation
+                        try:
+                            conn_resp = await self.connector_hub_client.invoke(
+                                connector_id=connector_name,
+                                capability=step.input.get("capability", "agent_invoke"),
+                                parameters=step.input,
+                                timeout_seconds=self.timeout_seconds,
+                                employee_id=self.employee_id,
+                            )
+                            return {
+                                "status": "success" if not conn_resp.error else "error",
+                                "output": {"text": str(conn_resp.result), "raw": conn_resp.model_dump()},
+                                "duration_ms": conn_resp.duration_ms,
+                                "run_id": "",
+                            }
+                        except Exception as e:
+                            logger.warning("connector_hub.invoke.failed", connector_id=connector_name, error=str(e))
+                            # Fall through to ModelHub proxy
                     input_json = json_module.dumps(step.input, ensure_ascii=False)
                     framed_input = _framed_prompt(input_json, "connector_param")
                     prompt = f"执行连接器：{connector_name}\n{framed_input}\n请执行并返回结果。"
