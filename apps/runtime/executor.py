@@ -12,15 +12,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import structlog
-
+from apps.model_hub.client import ModelHubClient
 from apps.runtime.models import PlanStep, TaskResult
 from apps.runtime.piagent_sidecar_client import PiAgentSidecarClient
 from common.config import settings
+from common.tracing import get_logger
 
 from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
 
-logger = structlog.get_logger("runtime.executor")
+logger = get_logger("runtime.executor")
 
 # ============== Prompt injection mitigation ==============
 
@@ -98,6 +98,7 @@ class RuntimeExecutor:
         self._piagent: Optional[PiAgentClient] = None
         self._sidecar_client: Optional[PiAgentSidecarClient] = None
         self._use_sidecar = retry_config.get("use_sidecar", False) if retry_config else False
+        self._use_model_hub = retry_config.get("use_model_hub", False) if retry_config else False
         self._gateway_token = gateway_token
 
     @property
@@ -122,6 +123,10 @@ class RuntimeExecutor:
                 sidecar_script=Path(cfg.sidecar_script) if cfg.sidecar_script else None,
             )
         return self._sidecar_client
+
+    @property
+    def model_hub_client(self) -> ModelHubClient:
+        return ModelHubClient.get_instance(base_url="http://127.0.0.1:8002", timeout=self.timeout_seconds)
 
     def start(self) -> None:
         """开始执行"""
@@ -209,7 +214,17 @@ class RuntimeExecutor:
         )
 
         try:
-            if self._use_sidecar:
+            if self._use_model_hub:
+                messages = [{"role": "user", "content": prompt}]
+                resp = await self.model_hub_client.chat(
+                    messages=messages,
+                    task_type="planning",
+                    session_id=self.task_id,
+                    employee_id=self.employee_id,
+                    timeout_seconds=self.timeout_seconds,
+                )
+                plan_text = resp.content
+            elif self._use_sidecar:
                 sidecar_result = await asyncio.wait_for(
                     self.sidecar_client.invoke(prompt),
                     timeout=self.timeout_seconds,
@@ -298,7 +313,22 @@ class RuntimeExecutor:
                 else:
                     prompt = f"执行步骤：{step.type}\n输入：{json_module.dumps(step.input, ensure_ascii=False)}"
 
-                if self._use_sidecar:
+                if self._use_model_hub:
+                    messages = [{"role": "user", "content": prompt}]
+                    resp = await self.model_hub_client.chat(
+                        messages=messages,
+                        task_type="code",
+                        session_id=self.task_id,
+                        employee_id=self.employee_id,
+                        timeout_seconds=self.timeout_seconds,
+                    )
+                    return {
+                        "status": "success",
+                        "output": {"text": resp.content, "raw": resp.raw},
+                        "duration_ms": resp.latency_ms,
+                        "run_id": "",
+                    }
+                elif self._use_sidecar:
                     sidecar_result = await asyncio.wait_for(
                         self.sidecar_client.invoke(prompt),
                         timeout=self.timeout_seconds,
@@ -379,7 +409,17 @@ class RuntimeExecutor:
         )
 
         try:
-            if self._use_sidecar:
+            if self._use_model_hub:
+                messages = [{"role": "user", "content": prompt}]
+                resp = await self.model_hub_client.chat(
+                    messages=messages,
+                    task_type="fast",
+                    session_id=self.task_id,
+                    employee_id=self.employee_id,
+                    timeout_seconds=self.timeout_seconds,
+                )
+                reflect_text = resp.content
+            elif self._use_sidecar:
                 sidecar_result = await asyncio.wait_for(
                     self.sidecar_client.invoke(prompt),
                     timeout=self.timeout_seconds,
