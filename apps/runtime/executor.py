@@ -16,8 +16,8 @@ from apps.connector_hub.client import ConnectorHubClient
 from apps.knowledge_hub.client import KnowledgeHubClient
 from apps.model_hub.client import ModelHubClient
 from apps.runtime.models import PlanStep, TaskResult
-from apps.skill_hub.client import SkillHubClient
 from apps.runtime.piagent_sidecar_client import PiAgentSidecarClient
+from apps.skill_hub.client import SkillHubClient
 from common.config import settings
 from common.tracing import get_logger
 
@@ -233,8 +233,7 @@ class RuntimeExecutor:
                 )
                 if search_resp.results:
                     docs = "\n\n".join(
-                        f"[{r.rank}] {r.document.title}: {r.document.content[:300]}"
-                        for r in search_resp.results
+                        f"[{r.rank}] {r.document.title}: {r.document.content[:300]}" for r in search_resp.results
                     )
                     rag_context = f"\n\n相关知识库内容：\n{docs}\n"
                     logger.info("knowledge_rag.enriched", task=task[:50], docs=len(search_resp.results))
@@ -346,16 +345,16 @@ class RuntimeExecutor:
                     if self._use_model_hub and skill_name:
                         # Use SkillHub for skill invocation
                         try:
-                            resp = await self.skill_hub_client.invoke_skill(
+                            skill_resp = await self.skill_hub_client.invoke_skill(
                                 skill_id=skill_name,
                                 parameters=step.input,
                                 timeout_seconds=self.timeout_seconds,
                                 employee_id=self.employee_id,
                             )
                             return {
-                                "status": "success" if not resp.error else "error",
-                                "output": {"text": str(resp.result), "raw": resp.model_dump()},
-                                "duration_ms": resp.duration_ms,
+                                "status": "success" if not skill_resp.error else "error",
+                                "output": {"text": str(skill_resp.result), "raw": skill_resp.model_dump()},
+                                "duration_ms": skill_resp.duration_ms,
                                 "run_id": "",
                             }
                         except Exception as e:
@@ -369,7 +368,7 @@ class RuntimeExecutor:
                     if self._use_model_hub and connector_name:
                         # Use ConnectorHub for connector invocation
                         try:
-                            resp = await self.connector_hub_client.invoke(
+                            conn_resp = await self.connector_hub_client.invoke(
                                 connector_id=connector_name,
                                 capability=step.input.get("capability", "agent_invoke"),
                                 parameters=step.input,
@@ -377,9 +376,9 @@ class RuntimeExecutor:
                                 employee_id=self.employee_id,
                             )
                             return {
-                                "status": "success" if not resp.error else "error",
-                                "output": {"text": str(resp.result), "raw": resp.model_dump()},
-                                "duration_ms": resp.duration_ms,
+                                "status": "success" if not conn_resp.error else "error",
+                                "output": {"text": str(conn_resp.result), "raw": conn_resp.model_dump()},
+                                "duration_ms": conn_resp.duration_ms,
                                 "run_id": "",
                             }
                         except Exception as e:
