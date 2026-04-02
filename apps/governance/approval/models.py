@@ -200,3 +200,17 @@ class ApprovalListResponse(BaseModel):
 
     requests: List[ApprovalRequest]
     total: int
+
+
+class ApprovalSubmitRequest(BaseModel):
+    """Submit an approval request."""
+
+    workflow_id: str
+    requester_id: str
+    tenant_id: str
+    resource_type: str
+    resource_id: str
+    attributes: Dict[str, Any] = Field(default_factory=dict)
+    resource_summary: str = ""
+
+    model_config = {"extra": "ignore"}

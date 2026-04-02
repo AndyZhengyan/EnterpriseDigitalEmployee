@@ -113,7 +113,8 @@ def assign_role(user_id: str, role: Role, tenant_id: str, assigned_by: str) -> U
             assigned_by=assigned_by,
         )
         _user_roles[key] = assignment
-    log.info("rbac.role.assigned", user_id=user_id, role=role.value, tenant_id=tenant_id)
+    role_str = role.value if isinstance(role, Role) else str(role)
+    log.info("rbac.role.assigned", user_id=user_id, role=role_str, tenant_id=tenant_id)
     return assignment
 
 
