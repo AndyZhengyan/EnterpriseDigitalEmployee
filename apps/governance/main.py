@@ -61,6 +61,25 @@ from apps.governance.rbac import (
     list_user_roles,
     revoke_role,
 )
+from apps.governance.tenant import (
+    Tenant,
+    TenantPlan,
+    TenantStatus,
+    check_quota,
+    delete_tenant,
+    get_quota,
+    get_tenant,
+    get_usage,
+    increment_api_calls,
+    list_tenants,
+    register_tenant,
+    set_usage,
+    suspend_tenant,
+    update_quota,
+)
+from apps.governance.tenant import (
+    _auto_seed as tenant_seed,
+)
 from common.tracing import get_logger
 
 log = get_logger("governance")
@@ -73,6 +92,7 @@ async def lifespan(app: FastAPI):
     rbac_seed()
     abac_seed()
     approval_seed()
+    tenant_seed()
     log.info(
         "governance.started",
         port=settings.port,
@@ -339,3 +359,127 @@ async def check_approval_timeouts() -> dict:
     """Check for timed-out approvals and escalate them. Returns escalated request IDs."""
     escalated = check_timeouts()
     return {"escalated": [r.request_id for r in escalated], "count": len(escalated)}
+
+
+# ============== Tenants ==============
+
+
+@app.post("/governance/tenants", status_code=201, tags=["多租户"])
+async def create_tenant(
+    name: str,
+    plan: TenantPlan = TenantPlan.FREE,
+    metadata: dict | None = None,
+    _: AuthContext = Depends(require_platform_admin),
+) -> Tenant:
+    """Register a new tenant (platform_admin only)."""
+    return register_tenant(name=name, plan=plan, metadata=metadata)
+
+
+@app.get("/governance/tenants", tags=["多租户"])
+async def list_all_tenants(
+    status: str | None = None,
+    _: AuthContext = Depends(require_platform_admin),
+) -> list[Tenant]:
+    """List all tenants (platform_admin only)."""
+    status_filter = TenantStatus(status) if status else None
+    return list_tenants(status=status_filter)
+
+
+@app.get("/governance/tenants/{tenant_id}", tags=["多租户"])
+async def get_tenant_endpoint(tenant_id: str) -> Tenant:
+    """Get a specific tenant."""
+    tenant = get_tenant(tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    return tenant
+
+
+@app.patch("/governance/tenants/{tenant_id}", tags=["多租户"])
+async def patch_tenant(
+    tenant_id: str,
+    status: str | None = None,
+    quota_max_users: int | None = None,
+    quota_max_api_calls: int | None = None,
+    quota_max_storage_mb: int | None = None,
+    quota_max_concurrent_tasks: int | None = None,
+    _: AuthContext = Depends(require_platform_admin),
+) -> dict:
+    """Update tenant status or quotas (platform_admin only)."""
+    if get_tenant(tenant_id) is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    if status:
+        if status == "suspended":
+            ok = suspend_tenant(tenant_id)
+        elif status == "deleted":
+            ok = delete_tenant(tenant_id)
+        else:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+        if not ok:
+            raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    if any(
+        v is not None for v in [quota_max_users, quota_max_api_calls, quota_max_storage_mb, quota_max_concurrent_tasks]
+    ):
+        update_quota(
+            tenant_id,
+            max_users=quota_max_users,
+            max_api_calls_per_day=quota_max_api_calls,
+            max_storage_mb=quota_max_storage_mb,
+            max_concurrent_tasks=quota_max_concurrent_tasks,
+        )
+    return {"tenant_id": tenant_id, "updated": True}
+
+
+@app.get("/governance/tenants/{tenant_id}/quota", tags=["多租户"])
+async def get_tenant_quota(tenant_id: str) -> dict:
+    """Get a tenant's current quota settings."""
+    quota = get_quota(tenant_id)
+    if quota is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    return {
+        "tenant_id": tenant_id,
+        "max_users": quota.max_users,
+        "max_api_calls_per_day": quota.max_api_calls_per_day,
+        "max_storage_mb": quota.max_storage_mb,
+        "max_concurrent_tasks": quota.max_concurrent_tasks,
+    }
+
+
+@app.get("/governance/tenants/{tenant_id}/usage", tags=["多租户"])
+async def get_tenant_usage(tenant_id: str) -> dict:
+    """Get a tenant's current usage statistics."""
+    usage = get_usage(tenant_id)
+    if usage is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    return {
+        "tenant_id": tenant_id,
+        "user_count": usage.user_count,
+        "api_calls_today": usage.api_calls_today,
+        "storage_mb": usage.storage_mb,
+        "concurrent_tasks": usage.concurrent_tasks,
+        "last_reset_at": usage.last_reset_at.isoformat(),
+    }
+
+
+@app.post("/governance/tenants/{tenant_id}/usage/increment", tags=["多租户"])
+async def record_api_call(tenant_id: str) -> dict:
+    """Increment daily API call counter for a tenant. Returns updated count."""
+    tenant = get_tenant(tenant_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    ok, reason = check_quota(tenant_id)
+    if not ok:
+        raise HTTPException(status_code=429, detail=f"Quota exceeded: {reason}")
+    count = increment_api_calls(tenant_id)
+    return {"tenant_id": tenant_id, "api_calls_today": count}
+
+
+@app.post("/governance/tenants/{tenant_id}/usage/reset", tags=["多租户"])
+async def reset_usage(
+    tenant_id: str,
+    _: AuthContext = Depends(require_platform_admin),
+) -> dict:
+    """Reset daily API call counter (platform_admin only)."""
+    updated = set_usage(tenant_id, api_calls_today=0, last_reset_at=datetime.now(timezone.utc))
+    if updated is None:
+        raise HTTPException(status_code=404, detail=f"Tenant '{tenant_id}' not found")
+    return {"tenant_id": tenant_id, "reset": True}
