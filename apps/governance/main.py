@@ -32,6 +32,7 @@ from apps.governance.approval.models import (
     ApprovalDecisionRequest,
     ApprovalListResponse,
     ApprovalResponse,
+    ApprovalSubmitRequest,
     ApprovalWorkflow,
 )
 from apps.governance.config import GovernanceSettings
@@ -160,7 +161,7 @@ async def assign_user_role(
         tenant_id=req.tenant_id,
         assigned_by=ctx.user_id,
     )
-    return {"assigned": True, "user_id": req.user_id, "role": req.role.value}
+    return {"assigned": True, "user_id": req.user_id, "role": req.role}
 
 
 @app.delete("/governance/roles/{tenant_id}/{user_id}", status_code=204, tags=["RBAC"])
@@ -293,24 +294,16 @@ async def list_approval_workflows() -> list[ApprovalWorkflow]:
 
 
 @app.post("/governance/approvals/submit", status_code=201, tags=["审批流"])
-async def submit_approval(
-    workflow_id: str,
-    requester_id: str,
-    tenant_id: str,
-    resource_type: str,
-    resource_id: str,
-    attributes: dict,
-    resource_summary: str = "",
-) -> dict:
+async def submit_approval(req: ApprovalSubmitRequest) -> dict:
     """Submit an approval request for a workflow."""
     result = submit_approval_request(
-        workflow_id=workflow_id,
-        requester_id=requester_id,
-        tenant_id=tenant_id,
-        resource_type=resource_type,
-        resource_id=resource_id,
-        attributes=attributes,
-        resource_summary=resource_summary,
+        workflow_id=req.workflow_id,
+        requester_id=req.requester_id,
+        tenant_id=req.tenant_id,
+        resource_type=req.resource_type,
+        resource_id=req.resource_id,
+        attributes=req.attributes,
+        resource_summary=req.resource_summary,
     )
     if result is None:
         # No matching step — no approval needed

@@ -6,15 +6,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 
 from apps.config_center import __version__
 from apps.config_center.models import (
     ConfigChangeType,
+    ConfigCreateRequest,
     ConfigItem,
     ConfigListResponse,
     ConfigNamespace,
     ConfigStatus,
+    ConfigUpdateRequest,
     ConfigVersionListResponse,
     Subscriber,
     SubscriberRegisterRequest,
@@ -39,6 +41,11 @@ from apps.config_center.store import (
 from common.tracing import get_logger
 
 log = get_logger("config_center")
+
+
+async def _notify_subscribers_bg(item: ConfigItem, change_type: str) -> None:
+    """Background task wrapper — push_sync is sync but safe to call from bg task."""
+    push_sync(item, change_type)
 
 
 @asynccontextmanager
@@ -99,26 +106,19 @@ async def list_configs(
 
 
 @app.post("/config-center/configs", status_code=201, tags=["配置项"])
-async def create_config(
-    namespace: str,
-    key: str,
-    value,
-    description: str = "",
-    tags: Optional[dict] = None,
-    created_by: str = "system",
-) -> ConfigItem:
+async def create_config(req: ConfigCreateRequest) -> ConfigItem:
     """Create a new config item (in DRAFT status)."""
-    get_or_create_namespace(namespace)
+    get_or_create_namespace(req.namespace)
     item, created = set_item(
-        namespace=namespace,
-        key=key,
-        value=value,
-        description=description,
-        tags=tags,
-        created_by=created_by,
+        namespace=req.namespace,
+        key=req.key,
+        value=req.value,
+        description=req.description,
+        tags=req.tags,
+        created_by=req.created_by,
     )
     if not created:
-        raise HTTPException(status_code=409, detail=f"Config '{namespace}/{key}' already exists")
+        raise HTTPException(status_code=409, detail=f"Config '{req.namespace}/{req.key}' already exists")
     return item
 
 
@@ -135,9 +135,7 @@ async def get_config(namespace: str, key: str) -> ConfigItem:
 async def update_config(
     namespace: str,
     key: str,
-    value,
-    description: Optional[str] = None,
-    tags: Optional[dict] = None,
+    req: ConfigUpdateRequest,
     created_by: str = "system",
 ) -> ConfigItem:
     """Update a config item (creates new draft version)."""
@@ -147,9 +145,9 @@ async def update_config(
     item, _ = set_item(
         namespace=namespace,
         key=key,
-        value=value,
-        description=description or existing.description,
-        tags=tags,
+        value=req.value,
+        description=req.description or existing.description,
+        tags=req.tags,
         created_by=created_by,
     )
     return item
@@ -161,24 +159,25 @@ async def publish_config(
     key: str,
     changed_by: str = "system",
     comment: str = "",
+    bg: BackgroundTasks = BackgroundTasks(),
 ) -> ConfigItem:
     """Publish a config item (activate it and push to subscribers)."""
     item = publish_item(namespace, key, changed_by=changed_by, comment=comment)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Config '{namespace}/{key}' not found")
-    # Push to subscribers asynchronously
-    push_sync(item, ConfigChangeType.PUBLISHED.value)
+    # Push to subscribers as background task
+    bg.add_task(_notify_subscribers_bg, item, ConfigChangeType.PUBLISHED.value)
     log.info("config.published", key=item.full_key(), version=item.version)
     return item
 
 
 @app.delete("/config-center/configs/{namespace}/{key}", tags=["配置项"])
-async def delete_config(namespace: str, key: str) -> dict:
+async def delete_config(namespace: str, key: str, bg: BackgroundTasks = BackgroundTasks()) -> dict:
     """Deprecate a config item."""
     item = deprecate_item(namespace, key)
     if item is None:
         raise HTTPException(status_code=404, detail=f"Config '{namespace}/{key}' not found")
-    push_sync(item, ConfigChangeType.DELETED.value)
+    bg.add_task(_notify_subscribers_bg, item, ConfigChangeType.DELETED.value)
     return {"namespace": namespace, "key": key, "deprecated": True}
 
 

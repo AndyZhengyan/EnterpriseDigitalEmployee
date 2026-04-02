@@ -73,7 +73,20 @@ async def notify_subscribers(item: ConfigItem, change_type: str) -> dict:
 
 def push_sync(item: ConfigItem, change_type: str) -> dict:
     """Synchronously notify subscribers. Returns results dict."""
-    return asyncio.run(notify_subscribers(item, change_type))
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop — safe to use asyncio.run()
+        return asyncio.run(notify_subscribers(item, change_type))
+    else:
+        # Running loop — use run_until_complete on a new task
+        import concurrent.futures
+
+        def _run():
+            return asyncio.run(notify_subscribers(item, change_type))
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(_run).result()
 
 
 def enqueue_notification(item: ConfigItem, change_type: str) -> None:
