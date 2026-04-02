@@ -1,0 +1,176 @@
+/* ============================================
+   e-Agent-OS Design System — v1.0
+   ============================================ */
+
+/* Google Fonts */
+@import '@fontsource/playfair-display/400.css';
+@import '@fontsource/dm-sans/400.css';
+@import '@fontsource/dm-sans/500.css';
+@import '@fontsource/dm-sans/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+/* ---------- Design Tokens ---------- */
+:root {
+  /* Backgrounds */
+  --bg-page:      #F5F0E8;
+  --bg-card:      #FFFFFF;
+  --bg-elevated:  #FAFAF8;
+
+  /* Text */
+  --text-primary:   #2C2A28;
+  --text-secondary: #8A8279;
+  --text-disabled:  #C4BFB8;
+
+  /* Accent */
+  --accent-primary: #2D5B7B;
+  --accent-hover:   #3A7299;
+
+  /* Status */
+  --status-sandbox:  #9A9490;
+  --status-shadow:   #C47A3D;
+  --status-active:   #4A7C59;
+  --status-archived: #A8A29E;
+
+  /* Functional */
+  --success: #4A7C59;
+  --warning: #C47A3D;
+  --danger:  #B84A3C;
+  --info:    #2D5B7B;
+
+  /* Borders & Shadows */
+  --border-subtle: rgba(44, 42, 40, 0.08);
+  --border-medium:  rgba(44, 42, 40, 0.15);
+  --shadow-card: 0 2px 8px rgba(44, 42, 40, 0.06), 0 1px 2px rgba(44, 42, 40, 0.04);
+  --shadow-elevated: 0 4px 16px rgba(44, 42, 40, 0.10), 0 2px 4px rgba(44, 42, 40, 0.06);
+  --shadow-modal: 0 20px 60px rgba(44, 42, 40, 0.20);
+
+  /* Spacing */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+
+  /* Radius */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  16px;
+
+  /* Fonts */
+  --font-serif: 'Playfair Display', 'Source Serif 4', Georgia, serif;
+  --font-sans:  'DM Sans', system-ui, sans-serif;
+  --font-mono:  'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* Layout */
+  --nav-height: 56px;
+
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-page:      #1A1917;
+    --bg-card:      #242220;
+    --bg-elevated:  #2E2C29;
+    --text-primary:   #F0EDE6;
+    --text-secondary: #9A9480;
+    --text-disabled:  #5A5750;
+    --accent-primary: #5A9EC4;
+    --accent-hover:   #6FB3D9;
+    --border-subtle: rgba(240, 237, 230, 0.07);
+    --border-medium:  rgba(240, 237, 230, 0.12);
+    --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.30), 0 1px 2px rgba(0, 0, 0, 0.20);
+    --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.40), 0 2px 4px rgba(0, 0, 0, 0.30);
+    color-scheme: dark;
+  }
+}
+
+/* ---------- Base Styles ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: var(--bg-page);
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: var(--font-sans); cursor: pointer; border: none; background: none; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+img { display: block; max-width: 100%; }
+
+/* ---------- Typography ---------- */
+h1, h2, h3 { margin: 0; font-weight: 500; }
+h1 { font-size: 28px; }
+h2 { font-size: 22px; }
+h3 { font-size: 18px; }
+p  { margin: 0; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  border: none;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--accent-hover); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+.btn-ghost:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border-subtle);
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-disabled); }
+
+/* ---------- Utilities ---------- */
+.serif { font-family: var(--font-serif); }
+.mono  { font-family: var(--font-mono); }
+.text-accent { color: var(--accent-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-success { color: var(--success); }
+.text-warning { color: var(--warning); }
+.text-danger { color: var(--danger); }
