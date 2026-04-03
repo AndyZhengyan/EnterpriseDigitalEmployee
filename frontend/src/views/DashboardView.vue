@@ -1,15 +1,28 @@
 <!-- frontend/src/views/DashboardView.vue -->
-<!-- e-Agent-OS OpCenter — Dashboard / Command Center View -->
+<!-- e-Agent-OS OpCenter — 绩效看板 -->
 <script setup>
 import { onMounted } from 'vue';
 import { useDashboard } from '../composables/useDashboard.js';
 import StatsCard from '../components/dashboard/StatsCard.vue';
 import StatusDonut from '../components/dashboard/StatusDonut.vue';
-import TokenChart from '../components/dashboard/TokenChart.vue';
+import TaskChart from '../components/dashboard/TaskChart.vue';
 import TaskTrend from '../components/dashboard/TaskTrend.vue';
+import CapabilityChart from '../components/dashboard/CapabilityChart.vue';
 import ActivityFeed from '../components/dashboard/ActivityFeed.vue';
 
-const { stats, statusDist, tokenTrend, taskTrend, activity, loading, error, fetchAll } = useDashboard();
+const {
+  stats,
+  statusDist,
+  tokenTrend,
+  taskTrend,
+  taskDetail,
+  tokenDaily,
+  capabilityDist,
+  activity,
+  loading,
+  error,
+  fetchAll,
+} = useDashboard();
 
 onMounted(fetchAll);
 </script>
@@ -30,51 +43,54 @@ onMounted(fetchAll);
 
     <!-- Content -->
     <template v-else-if="stats">
-      <!-- Stats Row — flat, compressed cards -->
+      <!-- Stats Row — 4 张扁平卡片 -->
       <section class="stats-row">
         <StatsCard
-          label="在线员工"
+          label="活跃 Avatar"
           :value="stats.onlineCount"
           sub="正式上岗"
           type="number"
         />
         <StatsCard
-          label="本月 Token 消耗"
-          :value="stats.totalTokenUsage"
-          type="number"
-        />
-        <StatsCard
-          label="本月完成任务"
+          label="任务完成"
           :value="stats.monthlyTasks"
           :trend="stats.taskTrend.change"
           :trend-dir="stats.taskTrend.direction"
           type="number"
         />
         <StatsCard
-          label="系统负载"
-          :value="stats.systemLoad"
-          type="load"
-          :load-value="stats.systemLoad"
+          label="任务成功率"
+          :value="stats.taskSuccessRate"
+          :trend="stats.successRateChange"
+          trend-dir="up"
+          type="percent"
+        />
+        <StatsCard
+          label="Token 效率"
+          :value="stats.tokenEfficiency"
+          :trend="stats.tokenTrendChange"
+          trend-dir="down"
+          type="efficiency"
         />
       </section>
 
-      <!-- Middle Row: donut (1 part) + token chart (2 parts) -->
+      <!-- Middle Row：环形图（50%）+ 双柱图（50%） -->
       <section class="middle-row">
-        <div class="donut-col">
+        <div class="col-left">
           <StatusDonut :data="statusDist" />
         </div>
-        <div class="token-col">
-          <TokenChart :data="tokenTrend" />
+        <div class="col-right">
+          <TaskChart :task-data="tokenTrend" :token-data="tokenDaily" />
         </div>
       </section>
 
-      <!-- Bottom Row: activity (65%) + task trend (35%) -->
+      <!-- Bottom Row：能力分布（35%）+ 动态流（65%） -->
       <section class="bottom-row">
-        <div class="activity-col">
-          <ActivityFeed :items="activity" />
+        <div class="col-left">
+          <CapabilityChart :data="capabilityDist" />
         </div>
-        <div class="trend-col">
-          <TaskTrend :data="taskTrend" />
+        <div class="col-right">
+          <ActivityFeed :items="activity" />
         </div>
       </section>
     </template>
@@ -88,11 +104,11 @@ onMounted(fetchAll);
   padding: var(--space-xl) var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: 24px; /* unified gap */
+  gap: 24px;
   min-height: calc(100vh - 56px);
 }
 
-/* Stats row: flat cards, 4 columns */
+/* Stats row */
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -105,10 +121,10 @@ onMounted(fetchAll);
   .stats-row { grid-template-columns: 1fr; }
 }
 
-/* Middle row: donut (1) + token chart (2) = 1:2 ratio */
+/* Middle row：各 50% */
 .middle-row {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: stretch;
 }
@@ -116,15 +132,21 @@ onMounted(fetchAll);
   .middle-row { grid-template-columns: 1fr; }
 }
 
-/* Bottom row: activity (65%) + trend (35%) */
+/* Bottom row：能力分布 35% / 动态流 65% */
 .bottom-row {
   display: grid;
-  grid-template-columns: 65fr 35fr;
+  grid-template-columns: 35fr 65fr;
   gap: 24px;
   align-items: stretch;
 }
 @media (max-width: 900px) {
   .bottom-row { grid-template-columns: 1fr; }
+}
+
+.col-left,
+.col-right {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Loading / Error */

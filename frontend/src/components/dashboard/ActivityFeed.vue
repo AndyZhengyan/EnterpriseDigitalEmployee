@@ -29,7 +29,12 @@ function relativeTime(iso) {
   <div class="activity-feed">
     <div class="feed-title">最近动态</div>
     <ul class="feed-list">
-      <li v-for="item in items" :key="item.id" class="feed-item">
+      <li
+        v-for="item in items"
+        :key="item.id"
+        class="feed-item"
+        :class="{ 'feed-item--failed': item.type === 'task_failed' }"
+      >
         <span class="feed-timeline">
           <span
             class="feed-dot"
@@ -37,8 +42,13 @@ function relativeTime(iso) {
           ></span>
         </span>
         <div class="feed-body">
-          <span class="feed-name">{{ item.employeeName }}</span>
-          <span class="feed-content">{{ item.content }}</span>
+          <div class="feed-avatar">
+            <span class="feed-alias">{{ item.alias }}</span>
+            <span class="feed-role">{{ item.role }} — {{ item.dept }}</span>
+          </div>
+          <div class="feed-content" :class="{ 'feed-content--failed': item.type === 'task_failed' }">
+            {{ item.content }}
+          </div>
         </div>
         <span class="feed-time">{{ relativeTime(item.timestamp) }}</span>
       </li>
@@ -102,21 +112,45 @@ function relativeTime(iso) {
 .feed-body {
   flex: 1;
   font-size: 13px;
-  line-height: 1.75;
+  line-height: 1.7;
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.feed-name {
-  font-weight: 600;
+.feed-avatar {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.feed-alias {
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-primary);
-  margin-right: 5px;
+  white-space: nowrap;
+}
+
+.feed-role {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .feed-content {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.feed-content--failed {
+  color: var(--danger);
+}
+
+.feed-item--failed .feed-dot {
+  box-shadow: 0 0 0 2px rgba(184, 74, 60, 0.20);
 }
 
 .feed-time {

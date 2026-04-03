@@ -7,6 +7,9 @@ import {
   MOCK_STATUS_DIST,
   MOCK_TOKEN_TREND,
   MOCK_TASK_TREND,
+  MOCK_TASK_DETAIL,
+  MOCK_TOKEN_DAILY,
+  MOCK_CAPABILITY_DIST,
   MOCK_ACTIVITY,
 } from '../mock/data.js';
 
@@ -62,6 +65,18 @@ function mockGetActivity({ limit = 10 } = {}) {
   return Promise.resolve({ data: MOCK_ACTIVITY.slice(0, limit) });
 }
 
+function mockGetTaskDetail() {
+  return Promise.resolve({ data: MOCK_TASK_DETAIL });
+}
+
+function mockGetTokenDaily() {
+  return Promise.resolve({ data: MOCK_TOKEN_DAILY });
+}
+
+function mockGetCapabilityDist() {
+  return Promise.resolve({ data: MOCK_CAPABILITY_DIST });
+}
+
 // ---- Public API Functions ----
 
 export const employeeApi = {
@@ -80,6 +95,12 @@ export const dashboardApi = {
     USE_MOCK ? mockGetTokenTrend() : api.get('/dashboard/token-trend'),
   taskTrend: () =>
     USE_MOCK ? mockGetTaskTrend() : api.get('/dashboard/task-trend'),
+  taskDetail: () =>
+    USE_MOCK ? mockGetTaskDetail() : api.get('/dashboard/task-detail'),
+  tokenDaily: () =>
+    USE_MOCK ? mockGetTokenDaily() : api.get('/dashboard/token-daily'),
+  capabilityDist: () =>
+    USE_MOCK ? mockGetCapabilityDist() : api.get('/dashboard/capability-dist'),
   activity: (params) =>
     USE_MOCK ? mockGetActivity(params) : api.get('/activity', { params }),
 };

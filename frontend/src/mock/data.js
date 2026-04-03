@@ -318,10 +318,14 @@ export const MOCK_DASHBOARD_STATS = {
   totalTokenUsage: 19480000,
   monthlyTasks: 4513,
   systemLoad: 68,
+  taskSuccessRate: 94.2,
+  tokenEfficiency: 3.2,
   taskTrend: {
     change: 12.4,
     direction: 'up',
   },
+  tokenTrendChange: -8.7,
+  successRateChange: 2.1,
 };
 
 // 状态分布
@@ -354,13 +358,41 @@ export const MOCK_TASK_TREND = [
   { date: '04-02', value: 118 },
 ];
 
+// 近7天任务详情（成功/失败分解，用于折线图）
+export const MOCK_TASK_DETAIL = {
+  dates: ['03-27', '03-28', '03-29', '03-30', '03-31', '04-01', '04-02'],
+  success: [138, 187, 106, 82, 221, 191, 111],
+  failed:   [  7,   11,    6,   5,   13,   10,    7],
+};
+
+// 近7天每日 Token 消耗（M），用于双柱图
+export const MOCK_TOKEN_DAILY = [
+  { date: '03-27', value: 1.82 },
+  { date: '03-28', value: 2.34 },
+  { date: '03-29', value: 1.56 },
+  { date: '03-30', value: 0.98 },
+  { date: '03-31', value: 3.12 },
+  { date: '04-01', value: 2.78 },
+  { date: '04-02', value: 1.64 },
+];
+
+// 能力分布（各岗位 Avatar 任务占比）
+export const MOCK_CAPABILITY_DIST = [
+  { role: '数据分析师', alias: '小龙', dept: '商业智能部', pct: 73 },
+  { role: '内容创作员', alias: '墨白', dept: '市场部',     pct: 18 },
+  { role: '运维工程师', alias: '铁柱', dept: '基础设施部', pct:  6 },
+  { role: '客服专员',   alias: '小红', dept: '客服部',     pct:  3 },
+];
+
 // 最近活动流
 export const MOCK_ACTIVITY = [
   {
     id: 'act-001',
     type: 'task_completed',
     employeeId: 'EMP-20260401-015',
-    employeeName: '马玉龙',
+    alias: '小龙',
+    role: '数据分析师',
+    dept: '商业智能部',
     content: '完成了「月度数据标注质量报告」',
     timestamp: new Date(Date.now() - 3 * 60_000).toISOString(),
   },
@@ -368,14 +400,18 @@ export const MOCK_ACTIVITY = [
     id: 'act-002',
     type: 'shadow_pass',
     employeeId: 'EMP-20260401-002',
-    employeeName: '陈小红',
+    alias: '小红',
+    role: '客服专员',
+    dept: '客服部',
     content: '试用期产出比对通过',
     timestamp: new Date(Date.now() - 18 * 60_000).toISOString(),
   },
   {
     id: 'act-003',
     type: 'employee_joined',
-    employeeName: '孙建国',
+    alias: '建国',
+    role: '知识库管理员',
+    dept: '数智部',
     content: '新员工入职（沙盒态）',
     timestamp: new Date(Date.now() - 60 * 60_000).toISOString(),
   },
@@ -383,7 +419,9 @@ export const MOCK_ACTIVITY = [
     id: 'act-004',
     type: 'task_failed',
     employeeId: 'EMP-20260401-005',
-    employeeName: '刘铁柱',
+    alias: '铁柱',
+    role: '运维工程师',
+    dept: '基础设施部',
     content: '任务执行失败，请检查日志',
     timestamp: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
   },
@@ -391,7 +429,9 @@ export const MOCK_ACTIVITY = [
     id: 'act-005',
     type: 'task_completed',
     employeeId: 'EMP-20260401-013',
-    employeeName: '林雅婷',
+    alias: '雅婷',
+    role: '产品经理',
+    dept: '产品部',
     content: '完成了「用户调研报告 v2.3」',
     timestamp: new Date(Date.now() - 3 * 60 * 60_000).toISOString(),
   },
@@ -399,7 +439,9 @@ export const MOCK_ACTIVITY = [
     id: 'act-006',
     type: 'task_completed',
     employeeId: 'EMP-20260401-007',
-    employeeName: '吴浩宇',
+    alias: '浩宇',
+    role: '算法工程师',
+    dept: '研发部',
     content: '完成了「推荐算法准确性验证」',
     timestamp: new Date(Date.now() - 5 * 60 * 60_000).toISOString(),
   },
@@ -407,7 +449,9 @@ export const MOCK_ACTIVITY = [
     id: 'act-007',
     type: 'status_changed',
     employeeId: 'EMP-20260402-016',
-    employeeName: '唐静怡',
+    alias: '静怡',
+    role: '品牌设计师',
+    dept: '市场部',
     content: '状态变更为「试用期」',
     timestamp: new Date(Date.now() - 8 * 60 * 60_000).toISOString(),
   },
@@ -415,7 +459,9 @@ export const MOCK_ACTIVITY = [
     id: 'act-008',
     type: 'task_completed',
     employeeId: 'EMP-20260401-012',
-    employeeName: '郑凯文',
+    alias: '凯文',
+    role: '前端工程师',
+    dept: '研发部',
     content: '完成了「前端组件库升级评估」',
     timestamp: new Date(Date.now() - 12 * 60 * 60_000).toISOString(),
   },
