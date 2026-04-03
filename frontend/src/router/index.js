@@ -14,7 +14,7 @@ const routes = [
   { path: '/onboarding', name: 'onboarding', component: OnboardingView },
   { path: '/enablement', name: 'enablement', component: EnablementView },
   { path: '/oracle', name: 'oracle', component: OracleView },
-  { path: '/audit', name: 'audit', component: JournalView },
+  { path: '/journal', name: 'journal', component: JournalView },
   { path: '/employees', name: 'employees', component: EmployeesView },
   { path: '/employees/:id', name: 'employee-detail', component: EmployeeDetailView },
 ];

@@ -10,7 +10,7 @@ const navItems = [
   { label: '入职中心', path: '/onboarding' },
   { label: '赋能中心', path: '/enablement' },
   { label: '档案中心', path: '/oracle' },
-  { label: '审计中心', path: '/audit' },
+  { label: '审计中心', path: '/journal' },
 ];
 
 function isActive(path) {
