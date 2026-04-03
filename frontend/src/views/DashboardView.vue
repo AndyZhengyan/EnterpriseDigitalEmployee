@@ -60,7 +60,9 @@ onMounted(fetchAll);
 
       <!-- Charts Row -->
       <section class="charts-row">
-        <StatusDonut :data="statusDist" class="donut-col" />
+        <div class="donut-col">
+          <StatusDonut :data="statusDist" />
+        </div>
         <div class="charts-pair">
           <TokenChart :data="tokenTrend" />
           <TaskTrend :data="taskTrend" />
@@ -102,14 +104,17 @@ onMounted(fetchAll);
 /* Charts row: donut left, charts right */
 .charts-row {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: var(--space-md);
   align-items: start;
 }
 @media (max-width: 900px) {
   .charts-row { grid-template-columns: 1fr; }
 }
-.donut-col { min-width: 0; }
+.charts-row .donut-col {
+  width: 100%;
+  box-sizing: border-box;
+}
 
 .charts-pair {
   display: grid;
