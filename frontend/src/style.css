@@ -13,9 +13,9 @@
 /* ---------- Design Tokens ---------- */
 :root {
   /* Backgrounds */
-  --bg-page:      #F5F0E8;
+  --bg-page:      #F9F8F6;
   --bg-card:      #FFFFFF;
-  --bg-elevated:  #FAFAF8;
+  --bg-elevated:  #F5F3EF;
 
   /* Text */
   --text-primary:   #2C2A28;
@@ -41,9 +41,12 @@
   /* Borders & Shadows */
   --border-subtle: rgba(44, 42, 40, 0.08);
   --border-medium:  rgba(44, 42, 40, 0.15);
-  --shadow-card: 0 2px 8px rgba(44, 42, 40, 0.06), 0 1px 2px rgba(44, 42, 40, 0.04);
-  --shadow-elevated: 0 4px 16px rgba(44, 42, 40, 0.10), 0 2px 4px rgba(44, 42, 40, 0.06);
-  --shadow-modal: 0 20px 60px rgba(44, 42, 40, 0.20);
+  --shadow-card: 0 1px 4px rgba(44, 42, 40, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.03);
+  --shadow-elevated: 0 2px 8px rgba(44, 42, 40, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --shadow-modal: 0 20px 60px rgba(44, 42, 40, 0.15);
+
+  /* Accent — terracotta */
+  --accent-warm: #C47A3D;
 
   /* Spacing */
   --space-xs:  4px;

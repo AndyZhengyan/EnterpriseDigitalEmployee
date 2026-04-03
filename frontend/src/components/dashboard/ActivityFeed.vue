@@ -5,12 +5,12 @@ const props = defineProps({
   items: { type: Array, default: () => [] },
 });
 
-const TYPE_CONFIG = {
-  task_completed:   { icon: '✓', color: 'var(--success)' },
-  task_failed:      { icon: '✗', color: 'var(--danger)' },
-  shadow_pass:      { icon: '★', color: 'var(--warning)' },
-  employee_joined:  { icon: '↑', color: 'var(--info)' },
-  status_changed:   { icon: '⟳', color: 'var(--text-secondary)' },
+const TYPE_DOT = {
+  task_completed:  'var(--success)',
+  task_failed:     'var(--danger)',
+  shadow_pass:     'var(--warning)',
+  employee_joined: 'var(--accent-primary)',
+  status_changed:  '#B0AA9F',
 };
 
 function relativeTime(iso) {
@@ -26,15 +26,15 @@ function relativeTime(iso) {
 </script>
 
 <template>
-  <div class="activity-feed card">
-    <h3 class="feed-title">最近动态</h3>
+  <div class="activity-feed">
+    <div class="feed-title">最近动态</div>
     <ul class="feed-list">
       <li v-for="item in items" :key="item.id" class="feed-item">
-        <span
-          class="feed-icon"
-          :style="{ color: TYPE_CONFIG[item.type]?.color ?? 'var(--text-secondary)' }"
-        >
-          {{ TYPE_CONFIG[item.type]?.icon ?? '•' }}
+        <span class="feed-timeline">
+          <span
+            class="feed-dot"
+            :style="{ background: TYPE_DOT[item.type] ?? '#B0AA9F' }"
+          ></span>
         </span>
         <div class="feed-body">
           <span class="feed-name">{{ item.employeeName }}</span>
@@ -48,59 +48,90 @@ function relativeTime(iso) {
 </template>
 
 <style scoped>
-.activity-feed { padding: var(--space-lg); }
-.feed-title {
-  font-family: var(--font-serif);
-  font-size: 18px;
-  font-weight: 500;
-  margin-bottom: var(--space-lg);
-  color: var(--text-primary);
+.activity-feed {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 16px 18px;
+  height: 100%;
 }
+
+.feed-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  margin-bottom: 14px;
+}
+
 .feed-list {
   list-style: none;
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
 }
+
 .feed-item {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-md);
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle);
 }
-.feed-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--bg-elevated);
+.feed-item:last-child {
+  border-bottom: none;
+}
+
+.feed-timeline {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: 14px;
+  padding-top: 5px;
   flex-shrink: 0;
-  margin-top: 2px;
 }
+
+.feed-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .feed-body {
   flex: 1;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.75;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  align-items: baseline;
 }
-.feed-name { font-weight: 500; color: var(--text-primary); }
-.feed-content { color: var(--text-secondary); }
+
+.feed-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-right: 5px;
+}
+
+.feed-content {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
 .feed-time {
-  font-size: 12px;
+  font-size: 10px;
   color: var(--text-disabled);
   white-space: nowrap;
-  margin-top: 3px;
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto;
 }
+
 .feed-empty {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text-disabled);
   text-align: center;
-  padding: var(--space-xl);
+  padding: 24px;
 }
 </style>

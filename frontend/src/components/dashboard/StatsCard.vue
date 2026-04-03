@@ -14,19 +14,21 @@ const props = defineProps({
 });
 
 function formatValue(type, val) {
-  if (type === 'percent' || type === 'load') return `${val}%`;
-  if (typeof val === 'number' && val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
-  if (typeof val === 'number' && val >= 1_000) return `${(val / 1_000).toFixed(0)}K`;
+  if (type === 'percent' || type === 'load') return `${val}`;
+  if (typeof val === 'number' && val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}`;
+  if (typeof val === 'number' && val >= 1_000) return `${(val / 1_000).toFixed(0)}`;
   return String(val);
 }
 
-function trendColor(dir) {
-  return dir === 'up' ? 'var(--success)' : 'var(--danger)';
+function unitSuffix(type, val) {
+  if (type === 'percent' || type === 'load') return '%';
+  if (typeof val === 'number' && val >= 1_000_000) return 'M';
+  if (typeof val === 'number' && val >= 1_000) return 'K';
+  return '';
 }
 
-function trendArrow(dir) {
-  return dir === 'up' ? '↑' : '↓';
-}
+const trendColor = computed(() => (props.trendDir === 'up') ? 'var(--success)' : 'var(--danger)');
+const trendArrow = computed(() => (props.trendDir === 'up') ? '↑' : '↓');
 
 const loadBarColor = computed(() => {
   if (props.loadValue >= 80) return 'var(--danger)';
@@ -36,30 +38,23 @@ const loadBarColor = computed(() => {
 </script>
 
 <template>
-  <div class="stats-card card">
-    <div class="stats-top">
-      <span class="stats-label">{{ label }}</span>
-      <span
-        v-if="trend !== null"
-        class="stats-trend"
-        :style="{ color: trendColor(trendDir) }"
-      >
-        {{ trendArrow(trendDir) }} {{ trend }}%
+  <div class="stats-card">
+    <div class="card-label">{{ label }}</div>
+    <div class="card-value">
+      <span class="number serif">{{ formatValue(type, value) }}</span>
+      <span class="unit">{{ unitSuffix(type, value) }}</span>
+    </div>
+    <div class="card-meta">
+      <span v-if="sub" class="sub">{{ sub }}</span>
+      <span v-if="trend !== null" class="trend" :style="{ color: trendColor }">
+        {{ trendArrow }} {{ trend }}%
       </span>
     </div>
-
-    <div class="stats-value">{{ formatValue(type, value) }}</div>
-
-    <div v-if="sub" class="stats-sub">{{ sub }}</div>
-
     <!-- Load bar (only for type='load') -->
     <div v-if="type === 'load'" class="load-track">
       <div
         class="load-fill"
-        :style="{
-          width: `${loadValue}%`,
-          background: loadBarColor
-        }"
+        :style="{ width: `${loadValue}%`, background: loadBarColor }"
       ></div>
     </div>
   </div>
@@ -67,49 +62,76 @@ const loadBarColor = computed(() => {
 
 <style scoped>
 .stats-card {
-  padding: var(--space-lg);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+  padding: 14px 18px 12px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 2px;
 }
-.stats-top {
+
+.card-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+}
+
+.card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.number {
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--text-primary);
+  letter-spacing: -1px;
+}
+
+.unit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-disabled);
+  align-self: flex-end;
+  margin-bottom: 3px;
+}
+
+.card-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-}
-.stats-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.stats-trend {
-  font-size: 13px;
-  font-weight: 600;
-}
-.stats-value {
-  font-family: var(--font-mono);
-  font-size: 32px;
-  font-weight: 500;
-  color: var(--accent-primary);
-  line-height: 1;
+  gap: 8px;
   margin-top: 2px;
 }
-.stats-sub {
-  font-size: 13px;
-  color: var(--text-secondary);
+
+.sub {
+  font-size: 11px;
+  color: var(--text-disabled);
 }
+
+.trend {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Load bar */
 .load-track {
-  height: 6px;
-  background: var(--bg-elevated);
-  border-radius: 3px;
+  height: 2px;
+  background: var(--border-subtle);
+  border-radius: 2px;
   overflow: hidden;
-  margin-top: var(--space-sm);
+  margin-top: 8px;
 }
 .load-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
   transition: width 800ms ease-out;
 }
 </style>

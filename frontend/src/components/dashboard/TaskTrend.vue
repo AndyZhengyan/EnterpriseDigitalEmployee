@@ -10,12 +10,13 @@ import {
   CategoryScale,
   LinearScale,
   Tooltip,
+  Filler,
 } from 'chart.js';
 
-Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip);
+Chart.register(LineController, LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Filler);
 
 const props = defineProps({
-  data: { type: Array, default: () => [] }, // [{ date, value }]
+  data: { type: Array, default: () => [] },
 });
 
 const canvas = ref(null);
@@ -30,12 +31,15 @@ function renderChart() {
       labels: props.data.map(d => d.date),
       datasets: [{
         data: props.data.map(d => d.value),
-        borderColor: 'var(--status-active)',
-        backgroundColor: 'rgba(74, 124, 89, 0.1)',
+        // Morandi dark teal
+        borderColor: 'rgba(142, 154, 175, 0.85)',
+        backgroundColor: 'rgba(142, 154, 175, 0.08)',
         fill: true,
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: 'var(--status-active)',
+        tension: 0.5,
+        pointRadius: 3,
+        pointBackgroundColor: 'rgba(142, 154, 175, 0.85)',
+        pointBorderWidth: 0,
+        borderWidth: 1.5,
       }],
     },
     options: {
@@ -43,19 +47,27 @@ function renderChart() {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => ` ${ctx.raw} 任务` } },
+        tooltip: {
+          backgroundColor: '#fff',
+          titleColor: '#2C2A28',
+          bodyColor: '#8A8279',
+          borderColor: 'rgba(44,42,40,0.08)',
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 6,
+          callbacks: { label: (ctx) => ` ${ctx.raw} 任务` },
+        },
       },
       scales: {
         x: {
           grid: { display: false },
-          ticks: { color: 'var(--text-secondary)', font: { size: 11 } },
+          border: { display: false },
+          ticks: { color: '#B0AA9F', font: { size: 11 } },
         },
         y: {
-          grid: { color: 'var(--border-subtle)' },
-          ticks: {
-            color: 'var(--text-secondary)',
-            font: { family: 'JetBrains Mono', size: 11 },
-          },
+          grid: { display: false },
+          border: { display: false },
+          ticks: { color: '#B0AA9F', font: { family: 'JetBrains Mono', size: 11 } },
         },
       },
     },
@@ -67,8 +79,8 @@ watch(() => props.data, () => { renderChart(); });
 </script>
 
 <template>
-  <div class="chart-card card">
-    <h3 class="chart-title">近7天任务完成趋势</h3>
+  <div class="chart-card">
+    <div class="chart-title">近7天任务完成趋势</div>
     <div class="chart-wrap">
       <canvas ref="canvas"></canvas>
     </div>
@@ -76,13 +88,20 @@ watch(() => props.data, () => { renderChart(); });
 </template>
 
 <style scoped>
-.chart-card { padding: var(--space-lg); }
-.chart-title {
-  font-family: var(--font-serif);
-  font-size: 18px;
-  font-weight: 500;
-  margin-bottom: var(--space-lg);
-  color: var(--text-primary);
+.chart-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 14px 18px 12px;
+  height: 100%;
 }
-.chart-wrap { height: 180px; position: relative; }
+.chart-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-disabled);
+  margin-bottom: 14px;
+}
+.chart-wrap { height: 170px; position: relative; }
 </style>

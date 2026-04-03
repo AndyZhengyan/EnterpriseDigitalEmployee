@@ -30,7 +30,7 @@ onMounted(fetchAll);
 
     <!-- Content -->
     <template v-else-if="stats">
-      <!-- Stats Row -->
+      <!-- Stats Row — flat, compressed cards -->
       <section class="stats-row">
         <StatsCard
           label="在线员工"
@@ -58,20 +58,24 @@ onMounted(fetchAll);
         />
       </section>
 
-      <!-- Charts Row -->
-      <section class="charts-row">
+      <!-- Middle Row: donut (1 part) + token chart (2 parts) -->
+      <section class="middle-row">
         <div class="donut-col">
           <StatusDonut :data="statusDist" />
         </div>
-        <div class="charts-pair">
+        <div class="token-col">
           <TokenChart :data="tokenTrend" />
-          <TaskTrend :data="taskTrend" />
         </div>
       </section>
 
-      <!-- Activity -->
-      <section class="activity-row">
-        <ActivityFeed :items="activity" />
+      <!-- Bottom Row: activity (65%) + task trend (35%) -->
+      <section class="bottom-row">
+        <div class="activity-col">
+          <ActivityFeed :items="activity" />
+        </div>
+        <div class="trend-col">
+          <TaskTrend :data="taskTrend" />
+        </div>
       </section>
     </template>
   </div>
@@ -84,15 +88,15 @@ onMounted(fetchAll);
   padding: var(--space-xl) var(--space-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--space-xl);
+  gap: 24px; /* unified gap */
   min-height: calc(100vh - 56px);
 }
 
-/* Stats grid: 4 columns desktop, 2 tablet, 1 mobile */
+/* Stats row: flat cards, 4 columns */
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-md);
+  gap: 24px;
 }
 @media (max-width: 900px) {
   .stats-row { grid-template-columns: repeat(2, 1fr); }
@@ -101,28 +105,26 @@ onMounted(fetchAll);
   .stats-row { grid-template-columns: 1fr; }
 }
 
-/* Charts row: donut left, charts right */
-.charts-row {
+/* Middle row: donut (1) + token chart (2) = 1:2 ratio */
+.middle-row {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: var(--space-md);
-  align-items: start;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+  align-items: stretch;
 }
 @media (max-width: 900px) {
-  .charts-row { grid-template-columns: 1fr; }
-}
-.charts-row .donut-col {
-  width: 100%;
-  box-sizing: border-box;
+  .middle-row { grid-template-columns: 1fr; }
 }
 
-.charts-pair {
+/* Bottom row: activity (65%) + trend (35%) */
+.bottom-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-md);
+  grid-template-columns: 65fr 35fr;
+  gap: 24px;
+  align-items: stretch;
 }
-@media (max-width: 700px) {
-  .charts-pair { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .bottom-row { grid-template-columns: 1fr; }
 }
 
 /* Loading / Error */
@@ -139,7 +141,7 @@ onMounted(fetchAll);
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid var(--border-subtle);
+  border: 2px solid var(--border-subtle);
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

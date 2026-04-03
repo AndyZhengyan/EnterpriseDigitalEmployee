@@ -9,7 +9,7 @@ const props = defineProps({
 
 const total = computed(() => props.data.reduce((s, d) => s + d.count, 0));
 
-const CX = 60, CY = 60, R = 40;
+const CX = 58, CY = 58, R = 42;
 
 const segments = computed(() => {
   const circumference = 2 * Math.PI * R;
@@ -26,15 +26,15 @@ const segments = computed(() => {
 </script>
 
 <template>
-  <div class="donut-wrap card">
+  <div class="donut-wrap">
     <div class="donut-svg-wrap">
-      <svg viewBox="0 0 120 120" class="donut-svg">
+      <svg viewBox="0 0 116 116" class="donut-svg">
         <!-- Background ring -->
         <circle
           :cx="CX" :cy="CY" :r="R"
           fill="none"
           stroke="var(--border-subtle)"
-          stroke-width="14"
+          stroke-width="13"
         />
         <!-- Segments -->
         <circle
@@ -43,15 +43,15 @@ const segments = computed(() => {
           :cx="CX" :cy="CY" :r="R"
           fill="none"
           :stroke="seg.color"
-          stroke-width="14"
+          stroke-width="13"
           :stroke-dasharray="`${seg.dash} ${seg.circumference}`"
           :stroke-dashoffset="-seg.offset + seg.circumference * 0.25"
           stroke-linecap="butt"
           style="transition: stroke-dasharray 600ms ease"
         />
-        <!-- Center text -->
-        <text x="60" y="55" text-anchor="middle" class="donut-total">{{ total }}</text>
-        <text x="60" y="70" text-anchor="middle" class="donut-sub">总员工</text>
+        <!-- Center text — big number + small label -->
+        <text x="58" y="49" text-anchor="middle" class="donut-total serif">{{ total }}</text>
+        <text x="58" y="65" text-anchor="middle" class="donut-sub">总员工</text>
       </svg>
     </div>
 
@@ -69,45 +69,63 @@ const segments = computed(() => {
 
 <style scoped>
 .donut-wrap {
-  padding: var(--space-lg);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  padding: 14px 18px;
   display: flex;
   align-items: center;
-  gap: var(--space-xl);
+  gap: 20px;
+  height: 100%;
 }
 .donut-svg-wrap { flex-shrink: 0; }
-.donut-svg { width: 120px; height: 120px; }
+.donut-svg { width: 116px; height: 116px; }
 .donut-total {
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 500;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 400;
   fill: var(--text-primary);
 }
-.donut-sub { font-size: 10px; fill: var(--text-secondary); }
+.donut-sub {
+  font-size: 9px;
+  fill: var(--text-disabled);
+  letter-spacing: 0.08em;
+}
 .donut-legend {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-sm);
+  gap: 8px;
 }
 .legend-row {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 8px;
 }
 .legend-dot {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.legend-label { font-size: 13px; color: var(--text-secondary); flex: 1; }
+.legend-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+  white-space: nowrap;
+}
 .legend-count {
   font-family: var(--font-mono);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
-  min-width: 24px;
+  min-width: 18px;
   text-align: right;
 }
-.legend-pct { font-size: 12px; color: var(--text-secondary); min-width: 32px; text-align: right; }
+.legend-pct {
+  font-size: 11px;
+  color: var(--text-disabled);
+  min-width: 26px;
+  text-align: right;
+}
 </style>

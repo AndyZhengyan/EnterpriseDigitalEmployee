@@ -6,9 +6,11 @@ import { useRoute } from 'vue-router';
 const route = useRoute();
 
 const navItems = [
-  { label: '指挥大厅', path: '/' },
-  { label: '工匠中心', path: '/forge' },
-  { label: '资产库', path: '/assets' },
+  { label: '绩效看板', path: '/performance' },
+  { label: '入职中心', path: '/onboarding' },
+  { label: '赋能中心', path: '/enablement' },
+  { label: '档案中心', path: '/oracle' },
+  { label: '工作日记', path: '/journal' },
 ];
 
 function isActive(path) {
@@ -106,15 +108,25 @@ function isActive(path) {
   color: var(--text-secondary);
   text-decoration: none;
   padding-bottom: 3px;
-  border-bottom: 2px solid transparent;
-  transition: color 150ms ease, border-color 150ms ease;
+  position: relative;
+  transition: color 150ms ease;
 }
 .nav-item:hover {
   color: var(--text-primary);
 }
 .nav-item.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
+  color: var(--accent-warm);
+}
+.nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 2px;
+  background: var(--accent-warm);
+  border-radius: 1px;
 }
 
 .topnav-right {
