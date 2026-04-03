@@ -1,6 +1,8 @@
 <!-- frontend/src/components/dashboard/StatsCard.vue -->
 <!-- e-Agent-OS OpCenter — Dashboard Stats Card -->
 <script setup>
+import { computed } from 'vue';
+
 const props = defineProps({
   label: { type: String, required: true },
   value: { type: [String, Number], required: true },
@@ -18,10 +20,15 @@ function formatValue(type, val) {
   return String(val);
 }
 
-const trendColor = $derived((dir) => dir === 'up' ? 'var(--success)' : 'var(--danger)');
-const trendArrow = $derived((dir) => dir === 'up' ? '↑' : '↓');
+function trendColor(dir) {
+  return dir === 'up' ? 'var(--success)' : 'var(--danger)';
+}
 
-const loadBarColor = $derived(() => {
+function trendArrow(dir) {
+  return dir === 'up' ? '↑' : '↓';
+}
+
+const loadBarColor = computed(() => {
   if (props.loadValue >= 80) return 'var(--danger)';
   if (props.loadValue >= 60) return 'var(--warning)';
   return 'var(--success)';
@@ -51,7 +58,7 @@ const loadBarColor = $derived(() => {
         class="load-fill"
         :style="{
           width: `${loadValue}%`,
-          background: loadBarColor()
+          background: loadBarColor
         }"
       ></div>
     </div>

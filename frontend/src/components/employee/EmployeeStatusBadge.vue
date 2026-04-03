@@ -1,6 +1,8 @@
 <!-- frontend/src/components/employee/EmployeeStatusBadge.vue -->
 <!-- e-Agent-OS OpCenter — Employee Status Badge -->
 <script setup>
+import { computed } from 'vue';
+
 const props = defineProps({
   status: {
     type: String,
@@ -17,7 +19,7 @@ const STATUS_CONFIG = {
   archived: { label: '退役',    color: 'var(--status-archived)', badge: false },
 };
 
-const config = $derived(STATUS_CONFIG[props.status] ?? STATUS_CONFIG.sandbox);
+const config = computed(() => STATUS_CONFIG[props.status] ?? STATUS_CONFIG.sandbox);
 </script>
 
 <template>

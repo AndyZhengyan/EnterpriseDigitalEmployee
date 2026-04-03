@@ -1,6 +1,7 @@
 <!-- frontend/src/components/employee/EmployeeFilters.vue -->
 <!-- e-Agent-OS OpCenter — Employee Filter Bar -->
 <script setup>
+import { computed } from 'vue';
 import { useEmployeeStore } from '../../stores/employeeStore.js';
 
 const store = useEmployeeStore();
@@ -13,8 +14,8 @@ const statusOptions = [
   { value: 'archived', label: '退役' },
 ];
 
-const hasFilters = $derived(
-  store.filterSearch || store.filterStatus || store.filterDepartment || store.filterTitle
+const hasFilters = computed(
+  () => store.filterSearch || store.filterStatus || store.filterDepartment || store.filterTitle
 );
 </script>
 

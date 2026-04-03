@@ -1,22 +1,25 @@
 <!-- frontend/src/components/dashboard/StatusDonut.vue -->
 <!-- e-Agent-OS OpCenter — Status Distribution Donut Chart -->
 <script setup>
+import { computed } from 'vue';
+
 const props = defineProps({
   data: { type: Array, default: () => [] }, // [{ status, label, count, color }]
 });
 
-const total = $derived(props.data.reduce((s, d) => s + d.count, 0));
+const total = computed(() => props.data.reduce((s, d) => s + d.count, 0));
 
 const CX = 60, CY = 60, R = 40;
 
-const segments = $derived(() => {
+const segments = computed(() => {
   const circumference = 2 * Math.PI * R;
   let offset = 0;
   return props.data.map(item => {
-    const pct = total.value > 0 ? item.count / total.value : 0;
+    const t = total.value;
+    const pct = t > 0 ? item.count / t : 0;
     const dash = pct * circumference;
-    const seg = { ...item, dash, offset: offset.value, circumference };
-    offset.value += dash;
+    const seg = { ...item, dash, offset, circumference };
+    offset += dash;
     return seg;
   });
 });
@@ -35,7 +38,7 @@ const segments = $derived(() => {
         />
         <!-- Segments -->
         <circle
-          v-for="seg in segments()"
+          v-for="seg in segments"
           :key="seg.status"
           :cx="CX" :cy="CY" :r="R"
           fill="none"
