@@ -77,19 +77,15 @@ def _eval_condition(value: float, condition: str, threshold: float) -> bool:
 
 def register_rule(rule: AlertRule) -> None:
     """Register an alert rule."""
-    print(f"REGISTER_RULE CALLED: {rule.id}, _active_rules id={id(_active_rules)}, current len={len(_active_rules)}", flush=True)
     with _lock:
         _active_rules[rule.id] = rule
-    print(f"REGISTER_RULE DONE: {rule.id}, _active_rules id={id(_active_rules)}, new len={len(_active_rules)}", flush=True)
     log.info("alert.rule.registered", rule_id=rule.id, name=rule.name)
 
 
 def list_rules() -> List[AlertRule]:
     """Return all alert rules."""
     with _lock:
-        result = list(_active_rules.values())
-    print(f"LIST_RULES: _active_rules id={id(_active_rules)}, len={len(result)}, keys={list(_active_rules.keys())}", flush=True)
-    return result
+        return list(_active_rules.values())
 
 
 def evaluate_rules() -> List[Alert]:
@@ -150,11 +146,5 @@ def update_rule_state(rule_id: str, new_state: AlertState) -> AlertRule:
 
 def _auto_seed() -> None:
     """Register built-in alert rules."""
-    # Force a test-visible failure if the loop body is not reached
-    assert len(_BUILTIN_RULES) >= 3, f"_BUILTIN_RULES empty: {len(_BUILTIN_RULES)}"
     for rule in _BUILTIN_RULES:
-        # Each call must add to _active_rules
-        before = len(_active_rules)
         register_rule(rule)
-        after = len(_active_rules)
-        assert after > before, f"register_rule({rule.id}) did not add rule: before={before}, after={after}"
