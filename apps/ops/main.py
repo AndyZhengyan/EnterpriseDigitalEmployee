@@ -5,7 +5,7 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,9 +32,7 @@ def verify_api_key(x_api_key: str = Header(default="")):
     return True
 
 
-CORS_ORIGINS = os.environ.get(
-    "OPS_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000"
-).split(",")
+CORS_ORIGINS = os.environ.get("OPS_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
 
 app = FastAPI(
     title="AvatarOS Ops API",
@@ -93,6 +91,7 @@ def _get_gateway_token() -> str:
 def _run_piagent(message: str, agent_id: str = "chat", timeout: int = 60) -> Dict[str, Any]:
     """Call openclaw CLI (pi-agent) and return parsed JSON result. Stub for CI."""
     import uuid
+
     # CI stub — openclaw CLI not available in GitHub Actions runner
     if os.environ.get("PIAGENT_CLI_STUB") == "true":
         return {
@@ -205,11 +204,40 @@ def _demo_scheduler():
 def startup():
     init_db()
 
+    # Ensure seed blueprint agents exist in openclaw dirs
+    _ensure_seed_agents()
+
     # Start background scheduler in a daemon thread
     global _runner_active
     _runner_active = True
     t = threading.Thread(target=_demo_scheduler, daemon=True)
     t.start()
+
+
+def _ensure_seed_agents():
+    """On startup, ensure seed blueprint agents exist in openclaw dirs.
+
+    Non-blocking: if openclaw dir is missing or registration fails, log and continue.
+    Only creates agents for the 4 DEMO_BLUEPRINTS — not for arbitrary blueprints.
+    """
+    try:
+        openclaw_dir = Path(os.environ.get("OPENCLAW_DIR", str(os.path.expanduser("~/.openclaw"))))
+        agents_dir = openclaw_dir / "agents"
+        registry = OpenclawAgentRegistry(openclaw_dir=openclaw_dir, agents_dir=agents_dir)
+
+        for bp_id, alias, role, dept in DEMO_BLUEPRINTS:
+            agent_path = agents_dir / bp_id / "agent"
+            if not agent_path.exists():
+                registry.register_agent(
+                    blueprint_id=bp_id,
+                    alias=alias,
+                    role=role,
+                    department=dept,
+                )
+
+        _log.info("seed_agents_ensured")
+    except Exception as e:
+        _log.warning("seed_agents_check_skipped", reason=str(e))
 
 
 @app.on_event("shutdown")
@@ -325,10 +353,18 @@ def get_activity(limit: int = 10):
             (limit - len(activity_items),),
         )
         for r in cur.fetchall():
-            activity_items.append({
-                "id": r[0], "type": r[1], "employeeId": r[2], "alias": r[3],
-                "role": r[4], "dept": r[5], "content": r[6], "timestamp": r[7],
-            })
+            activity_items.append(
+                {
+                    "id": r[0],
+                    "type": r[1],
+                    "employeeId": r[2],
+                    "alias": r[3],
+                    "role": r[4],
+                    "dept": r[5],
+                    "content": r[6],
+                    "timestamp": r[7],
+                }
+            )
         conn.close()
 
     # Sort by timestamp descending, take top `limit`
@@ -337,24 +373,6 @@ def get_activity(limit: int = 10):
 
 
 # ── PiAgent Execute ────────────────────────────────────────────
-
-
-class ExecuteRequest:
-    def __init__(
-        self,
-        message: str,
-        agent_id: str = "chat",
-        blueprint_id: Optional[str] = None,
-        alias: str = "",
-        role: str = "",
-        dept: str = "",
-    ):
-        self.message = message
-        self.agent_id = agent_id
-        self.blueprint_id = blueprint_id or "av-swe-001"
-        self.alias = alias or "码哥"
-        self.role = role or "软件工程师"
-        self.dept = dept or "技术研发部"
 
 
 @app.post("/api/ops/execute")
@@ -427,8 +445,17 @@ def get_blueprints(_: bool = Depends(verify_api_key)):
     cur.execute("SELECT id, role, alias, department, versions, capacity FROM blueprints")
     rows = cur.fetchall()
     conn.close()
-    return [{"id": r[0], "role": r[1], "alias": r[2], "department": r[3],
-             "versions": json.loads(r[4]), "capacity": json.loads(r[5])} for r in rows]
+    return [
+        {
+            "id": r[0],
+            "role": r[1],
+            "alias": r[2],
+            "department": r[3],
+            "versions": json.loads(r[4]),
+            "capacity": json.loads(r[5]),
+        }
+        for r in rows
+    ]
 
 
 @app.post("/api/onboarding/deploy")
