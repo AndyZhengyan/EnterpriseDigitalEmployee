@@ -1,0 +1,305 @@
+# Kubernetes deployments for e-Agent-OS services.
+# Apply with: kubectl apply -f k8s/
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: e-agent-os
+  labels:
+    app: gateway
+    tier: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+        tier: frontend
+    spec:
+      containers:
+        - name: gateway
+          image: ghcr.io/andyzhengyan/enterprise-agent-employee:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "uvicorn", "apps.gateway.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          env:
+            - name: SERVICE_PORT
+              value: "8000"
+            - name: RUNTIME_URL
+              value: "http://runtime:8001"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: e-agent-os-secrets
+                  key: secret-key
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: runtime
+  namespace: e-agent-os
+  labels:
+    app: runtime
+    tier: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: runtime
+  template:
+    metadata:
+      labels:
+        app: runtime
+        tier: backend
+    spec:
+      containers:
+        - name: runtime
+          image: ghcr.io/andyzhengyan/enterprise-agent-employee:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "uvicorn", "apps.runtime.main:app", "--host", "0.0.0.0", "--port", "8001"]
+          ports:
+            - containerPort: 8001
+          env:
+            - name: SERVICE_PORT
+              value: "8001"
+            - name: MODEL_HUB_URL
+              value: "http://model-hub:8002"
+            - name: SKILL_HUB_URL
+              value: "http://skill-hub:8004"
+            - name: CONNECTOR_HUB_URL
+              value: "http://connector-hub:8003"
+            - name: KNOWLEDGE_HUB_URL
+              value: "http://knowledge-hub:8005"
+            - name: GOVERNANCE_URL
+              value: "http://governance:8007"
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+            - name: MODEL_HUB_ENABLED
+              value: "true"
+            - name: KNOWLEDGE_RAG_ENABLED
+              value: "true"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: model-hub
+  namespace: e-agent-os
+  labels:
+    app: model-hub
+    tier: hub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: model-hub
+  template:
+    metadata:
+      labels:
+        app: model-hub
+        tier: hub
+    spec:
+      containers:
+        - name: model-hub
+          image: ghcr.io/andyzhengyan/enterprise-agent-employee:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "uvicorn", "apps.model_hub.main:app", "--host", "0.0.0.0", "--port", "8002"]
+          ports:
+            - containerPort: 8002
+          env:
+            - name: SERVICE_PORT
+              value: "8002"
+            - name: PIAGENT_HTTP_PORT
+              value: "8090"
+            - name: MINIMAX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: e-agent-os-secrets
+                  key: minimax-api-key
+                  optional: true
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /model-hub/health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: governance
+  namespace: e-agent-os
+  labels:
+    app: governance
+    tier: hub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: governance
+  template:
+    metadata:
+      labels:
+        app: governance
+        tier: hub
+    spec:
+      containers:
+        - name: governance
+          image: ghcr.io/andyzhengyan/enterprise-agent-employee:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "uvicorn", "apps.governance.main:app", "--host", "0.0.0.0", "--port", "8007"]
+          ports:
+            - containerPort: 8007
+          env:
+            - name: SERVICE_PORT
+              value: "8007"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: e-agent-os-secrets
+                  key: jwt-secret
+            - name: JWT_ALGORITHM
+              value: "HS256"
+            - name: JWT_EXPIRY_SECONDS
+              value: "3600"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /governance/health
+              port: 8007
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-center
+  namespace: e-agent-os
+  labels:
+    app: config-center
+    tier: hub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: config-center
+  template:
+    metadata:
+      labels:
+        app: config-center
+        tier: hub
+    spec:
+      containers:
+        - name: config-center
+          image: ghcr.io/andyzhengyan/enterprise-agent-employee:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "uvicorn", "apps.config_center.main:app", "--host", "0.0.0.0", "--port", "8008"]
+          ports:
+            - containerPort: 8008
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /config-center/health
+              port: 8008
+            initialDelaySeconds: 10
+            periodSeconds: 30
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: e-agent-os
+  labels:
+    app: redis
+    tier: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        tier: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          emptyDir: {}

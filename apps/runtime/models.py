@@ -175,6 +175,7 @@ class StatusResponse(BaseModel):
     estimated_finish_at: Optional[datetime] = None
     steps: List[StepInfo] = Field(default_factory=list)
     trace_id: Optional[str] = None
+    result: Optional[TaskResult] = None
 
     model_config = {"use_enum_values": True}
 

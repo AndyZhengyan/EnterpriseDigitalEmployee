@@ -4,7 +4,6 @@ import {
   type AgentSession,
   AuthStorage,
   ModelRegistry,
-  SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import { getModel } from "@mariozechner/pi-ai";
 
@@ -22,7 +21,7 @@ export class SidecarSessionManager {
   private sessions = new Map<string, PooledSession>();
   private defaultSession?: AgentSession;
 
-  async getOrCreate(sessionId?: string): Promise<AgentSession> {
+  async getOrCreate(sessionId?: string, model?: ReturnType<typeof getModel>): Promise<AgentSession> {
     if (sessionId) {
       const pooled = this.sessions.get(sessionId);
       if (pooled) {
@@ -33,10 +32,9 @@ export class SidecarSessionManager {
 
     const authStorage = AuthStorage.create();
     const { session } = await createAgentSession({
-      sessionManager: SessionManager.inMemory(),
       authStorage,
-      modelRegistry: ModelRegistry.inMemory(authStorage),
-      model: DEFAULT_MODEL,
+      modelRegistry: new ModelRegistry(authStorage),
+      model: model ?? DEFAULT_MODEL,
     });
 
     if (sessionId) {

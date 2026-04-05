@@ -1,0 +1,52 @@
+# Kubernetes Ingress for e-Agent-OS
+# Requires an ingress controller (nginx-ingress, traefik, etc.)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: e-agent-os
+  namespace: e-agent-os
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: e-agent-os.example.com
+      http:
+        paths:
+          - path: /gateway
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port:
+                  number: 80
+          - path: /api/runtime
+            pathType: Prefix
+            backend:
+              service:
+                name: runtime
+                port:
+                  number: 8001
+          - path: /api/model-hub
+            pathType: Prefix
+            backend:
+              service:
+                name: model-hub
+                port:
+                  number: 8002
+          - path: /api/governance
+            pathType: Prefix
+            backend:
+              service:
+                name: governance
+                port:
+                  number: 8007
+          - path: /api/config-center
+            pathType: Prefix
+            backend:
+              service:
+                name: config-center
+                port:
+                  number: 8008

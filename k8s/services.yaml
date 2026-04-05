@@ -1,0 +1,85 @@
+# Kubernetes services for e-Agent-OS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: e-agent-os
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: runtime
+  namespace: e-agent-os
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+  selector:
+    app: runtime
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: model-hub
+  namespace: e-agent-os
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8002
+      targetPort: 8002
+      protocol: TCP
+  selector:
+    app: model-hub
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: governance
+  namespace: e-agent-os
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8007
+      targetPort: 8007
+      protocol: TCP
+  selector:
+    app: governance
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-center
+  namespace: e-agent-os
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8008
+      targetPort: 8008
+      protocol: TCP
+  selector:
+    app: config-center
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: e-agent-os
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+  selector:
+    app: redis
