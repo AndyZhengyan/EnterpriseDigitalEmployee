@@ -5,8 +5,8 @@ from __future__ import annotations
 import pytest
 
 from apps.ops_center.engine import (
-    _auto_seed,
     _active_rules,
+    _auto_seed,
     _eval_condition,
     _firing_alerts,
     evaluate_rules,
