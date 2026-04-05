@@ -385,8 +385,8 @@ def execute_task(req: dict, _: bool = Depends(verify_api_key)):
     if not message:
         raise HTTPException(status_code=400, detail="message is required")
 
-    agent_id = req.get("blueprint_id")
-    bp_id = req.get("blueprint_id", "av-swe-001")
+    agent_id = req.get("blueprint_id", "av-swe-001")
+    bp_id = agent_id
     alias = req.get("alias", "码哥")
     role = req.get("role", "软件工程师")
     dept = req.get("dept", "技术研发部")

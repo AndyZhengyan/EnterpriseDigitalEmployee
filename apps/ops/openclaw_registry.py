@@ -2,7 +2,7 @@
 
 import shutil
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import structlog
 
@@ -65,8 +65,8 @@ class OpenclawAgentRegistry:
 
     def __init__(
         self,
-        openclaw_dir: Path = None,
-        agents_dir: Path = None,
+        openclaw_dir: Optional[Path] = None,
+        agents_dir: Optional[Path] = None,
     ):
         self.openclaw_dir = openclaw_dir or DEFAULT_OPENCLAW_DIR
         self.agents_dir = agents_dir or (self.openclaw_dir / "agents")
@@ -77,7 +77,7 @@ class OpenclawAgentRegistry:
         alias: str,
         role: str,
         department: str,
-        soul: Dict[str, Any] = None,
+        soul: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """Create or update agent directory for a blueprint."""
         soul = soul or {}
