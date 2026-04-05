@@ -106,10 +106,12 @@ class TestAlertEngine:
 
     def test_builtin_rules_registered(self):
         _reset()
-        from apps.ops_center.engine import _auto_seed
+        from apps.ops_center.engine import _auto_seed, _BUILTIN_RULES
 
+        assert len(_BUILTIN_RULES) >= 3, f"DEBUG: _BUILTIN_RULES has {len(_BUILTIN_RULES)} items"
         _auto_seed()
-        assert len(list_rules()) >= 3  # At least 3 built-in rules
+        result = list_rules()
+        assert len(result) >= 3, f"DEBUG: after _auto_seed, list_rules() returned {len(result)} rules: {[r.id for r in result]}"  # At least 3 built-in rules
 
 
 class TestEvalCondition:
