@@ -60,6 +60,10 @@ credentials.*
 node_modules/
 package-lock.json
 
+# Frontend package-lock.json (needed for CI npm ci)
+# (negate the above rule for frontend subdirectory)
+!frontend/package-lock.json
+
 # Probe/debug scripts with hardcoded tokens (security risk)
 scripts/probe_*.py
 scripts/traffic_proxy.py

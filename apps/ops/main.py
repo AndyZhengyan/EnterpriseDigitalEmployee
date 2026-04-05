@@ -1,0 +1,610 @@
+# apps/ops/main.py — Ops Center API (Dashboard + Onboarding + PiAgent)
+import json
+import os
+import subprocess
+import threading
+import time
+from pathlib import Path
+from typing import Any, Dict
+
+from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+
+from common.tracing import get_logger as _ops_get_logger
+
+from .db import (
+    get_db,
+    get_recent_executions,
+    init_db,
+    record_execution,
+)
+from .openclaw_registry import OpenclawAgentRegistry
+
+OPS_API_KEY = os.environ.get("OPS_API_KEY", "")
+
+
+def verify_api_key(x_api_key: str = Header(default="")):
+    if not OPS_API_KEY:
+        # If no OPS_API_KEY is set, allow access (dev mode)
+        return True
+    if x_api_key != OPS_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return True
+
+
+CORS_ORIGINS = os.environ.get("OPS_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+
+app = FastAPI(
+    title="AvatarOS Ops API",
+    description="AvatarOS 运营数据 + 入职中心 API + PiAgent 集成",
+    version="0.2.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ── Background demo task scheduler ────────────────────────────
+# Periodically runs sample tasks against PiAgent to populate live dashboard data.
+
+DEMO_MESSAGES = [
+    "帮我整理一下本周的工作进展，写一份简短的周报",
+    "检查一下合同文件中的关键条款有没有风险",
+    "分析一下本月的数据报表，列出主要增长点",
+    "帮我写一封给客户的商务邮件，回复关于合作条款的询问",
+    "检索一下最新的数据安全法规，整理要点",
+    "生成本月运营数据的可视化图表",
+    "审阅这份技术方案文档，提出改进建议",
+    "帮我查询最近的行业竞品动态",
+]
+
+DEMO_BLUEPRINTS = [
+    ("av-admin-001", "小白", "行政专员", "综合管理部"),
+    ("av-legal-001", "明律", "法务专员", "法务合规部"),
+    ("av-contract-001", "墨言", "合同专员", "商务运营部"),
+    ("av-swe-001", "码哥", "软件工程师", "技术研发部"),
+]
+
+_runner_active = False
+_log = _ops_get_logger("ops")
+
+
+def _get_gateway_token() -> str:
+    """Read gateway token from openclaw config or env."""
+    token = os.environ.get("OPENCLAW_GATEWAY_TOKEN")
+    if token:
+        return token
+    config_path = os.path.expanduser("~/.openclaw/openclaw.json")
+    try:
+        with open(config_path) as f:
+            cfg = json.load(f)
+            return cfg.get("gateway", {}).get("auth", {}).get("token", "")
+    except Exception:
+        return ""
+
+
+def _run_piagent(message: str, agent_id: str = "chat", timeout: int = 60) -> Dict[str, Any]:
+    """Call openclaw CLI (pi-agent) and return parsed JSON result. Stub for CI."""
+    import uuid
+
+    # CI stub — openclaw CLI not available in GitHub Actions runner
+    if os.environ.get("PIAGENT_CLI_STUB") == "true":
+        return {
+            "status": "ok",
+            "runId": f"stub-{uuid.uuid4().hex[:8]}",
+            "summary": "CI stub response — this is a simulated agent execution",
+            "result": {
+                "meta": {
+                    "agentMeta": {
+                        "usage": {"input": 1200, "output": 340, "cacheRead": 0},
+                        "durationMs": 2100,
+                    }
+                }
+            },
+        }
+    # ... 其余逻辑不变 ...
+    token = _get_gateway_token()
+    gateway_url = os.environ.get("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "OPENCLAW_GATEWAY_TOKEN": token,
+        "OPENCLAW_GATEWAY_URL": gateway_url,
+    }
+    try:
+        result = subprocess.run(
+            [
+                "openclaw",
+                "agent",
+                "--agent",
+                agent_id,
+                "--message",
+                message,
+                "--json",
+                "--thinking",
+                "medium",
+                "--timeout",
+                str(timeout),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout + 5,
+            env=env,
+            check=False,
+        )
+        if result.returncode != 0:
+            return {"status": "error", "summary": f"CLI error: {result.stderr[:200]}", "usage": {}}
+        stdout = result.stdout.strip()
+        if not stdout:
+            return {"status": "error", "summary": "Empty response", "usage": {}}
+        return json.loads(stdout)
+    except FileNotFoundError:
+        return {"status": "error", "summary": "openclaw CLI not found in PATH", "usage": {}}
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "summary": "Execution timed out", "usage": {}}
+    except json.JSONDecodeError as e:
+        return {"status": "error", "summary": f"Invalid JSON: {e}", "usage": {}}
+    except Exception as e:
+        return {"status": "error", "summary": str(e), "usage": {}}
+
+
+def _demo_scheduler():
+    """Background loop: run demo tasks every 30 seconds."""
+    global _runner_active
+    idx = 0
+    log = _ops_get_logger("ops_scheduler")
+    log.info("scheduler_thread_started")
+    while _runner_active:
+        bp_id, alias, role, dept = DEMO_BLUEPRINTS[idx % len(DEMO_BLUEPRINTS)]
+        message = DEMO_MESSAGES[idx % len(DEMO_MESSAGES)]
+        idx += 1
+
+        try:
+            raw = _run_piagent(message, bp_id, timeout=60)
+            meta = raw.get("result", {}).get("meta", {})
+            usage = meta.get("agentMeta", {}).get("usage", {})
+            token_input = usage.get("input", 0)
+            token_completion = usage.get("output", 0)
+            status = raw.get("status", "ok")
+            run_id = raw.get("runId", "")
+            summary = raw.get("summary", "")
+            duration_ms = meta.get("durationMs", 0)
+
+            if run_id:
+                exec_id = record_execution(
+                    run_id=run_id,
+                    blueprint_id=bp_id,
+                    alias=alias,
+                    role=role,
+                    dept=dept,
+                    message=message,
+                    status=status,
+                    token_input=token_input,
+                    token_analysis=usage.get("cacheRead", 0),
+                    token_completion=token_completion,
+                    duration_ms=duration_ms,
+                    summary=summary[:200] if summary else "",
+                )
+                tok = token_input + token_completion
+                log.info("demo_task_completed", idx=idx, alias=alias, tokens=tok, exec_id=exec_id, run_id=run_id[:8])
+            else:
+                summary_preview = raw.get("summary", "unknown")[:40]
+                log.warning("demo_task_no_run_id", idx=idx, summary=summary_preview)
+        except Exception as e:
+            log.error("demo_task_error", idx=idx, error=str(e))
+
+        time.sleep(30)
+
+
+@app.on_event("startup")
+def startup():
+    init_db()
+
+    # Ensure seed blueprint agents exist in openclaw dirs
+    _ensure_seed_agents()
+
+    # Start background scheduler in a daemon thread
+    global _runner_active
+    _runner_active = True
+    t = threading.Thread(target=_demo_scheduler, daemon=True)
+    t.start()
+
+
+def _ensure_seed_agents():
+    """On startup, ensure seed blueprint agents exist in openclaw dirs.
+
+    Non-blocking: if openclaw dir is missing or registration fails, log and continue.
+    Only creates agents for the 4 DEMO_BLUEPRINTS — not for arbitrary blueprints.
+    """
+    try:
+        openclaw_dir = Path(os.environ.get("OPENCLAW_DIR", str(os.path.expanduser("~/.openclaw"))))
+        agents_dir = openclaw_dir / "agents"
+        registry = OpenclawAgentRegistry(openclaw_dir=openclaw_dir, agents_dir=agents_dir)
+
+        for bp_id, alias, role, dept in DEMO_BLUEPRINTS:
+            agent_path = agents_dir / bp_id / "agent"
+            if not agent_path.exists():
+                registry.register_agent(
+                    blueprint_id=bp_id,
+                    alias=alias,
+                    role=role,
+                    department=dept,
+                )
+
+        _log.info("seed_agents_ensured")
+    except Exception as e:
+        _log.warning("seed_agents_check_skipped", reason=str(e))
+
+
+@app.on_event("shutdown")
+def shutdown():
+    global _runner_active
+    _runner_active = False
+
+
+# ── Dashboard ────────────────────────────────────────────────
+
+
+@app.get("/api/dashboard/stats")
+def get_stats():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT online_count, total_token_usage, monthly_tasks, system_load,
+               task_success_rate, token_efficiency, task_trend_change, success_rate_change
+        FROM dashboard_stats LIMIT 1
+    """)
+    row = cur.fetchone()
+    conn.close()
+    direction = "down" if row[6] < 0 else "up"
+    return {
+        "onlineCount": row[0],
+        "totalTokenUsage": row[1],
+        "monthlyTasks": row[2],
+        "systemLoad": row[3],
+        "taskSuccessRate": row[4],
+        "tokenEfficiency": row[5],
+        "taskTrend": {"change": row[6], "direction": direction},
+        "tokenTrendChange": row[6],
+        "successRateChange": row[7],
+    }
+
+
+@app.get("/api/dashboard/status-dist")
+def get_status_dist():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT status, label, count, color FROM status_dist")
+    rows = [{"status": r[0], "label": r[1], "count": r[2], "color": r[3]} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+@app.get("/api/dashboard/token-trend")
+def get_token_trend():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT date, value FROM token_daily ORDER BY date")
+    rows = [{"date": r[0], "value": r[1]} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+@app.get("/api/dashboard/task-detail")
+def get_task_detail():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT dates, success, failed FROM task_detail LIMIT 1")
+    row = cur.fetchone()
+    row = {"dates": row[0], "success": row[1], "failed": row[2]}
+    conn.close()
+    return {
+        "dates": json.loads(row["dates"]),
+        "success": json.loads(row["success"]),
+        "failed": json.loads(row["failed"]),
+    }
+
+
+@app.get("/api/dashboard/token-daily")
+def get_token_daily():
+    return get_token_trend()
+
+
+@app.get("/api/dashboard/capability-dist")
+def get_capability_dist():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT role, alias, dept, pct FROM capability_dist ORDER BY pct DESC")
+    rows = [{"role": r[0], "alias": r[1], "dept": r[2], "pct": r[3]} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+@app.get("/api/dashboard/activity")
+def get_activity(limit: int = 10):
+    # Blend real executions with seed activity_log
+    executions = get_recent_executions(limit=limit)
+
+    activity_items = []
+    for ex in executions:
+        activity_items.append(
+            {
+                "id": ex["id"],
+                "type": "task_completed" if ex["status"] == "ok" else "task_failed",
+                "employeeId": ex["blueprint_id"],
+                "alias": ex["alias"],
+                "role": ex["role"],
+                "dept": ex["dept"],
+                "content": ex["summary"] or ex["message"][:60],
+                "timestamp": ex["created_at"],
+            }
+        )
+
+    if len(activity_items) < limit:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, type, employee_id, alias, role, dept, content, timestamp "
+            "FROM activity_log ORDER BY timestamp DESC LIMIT ?",
+            (limit - len(activity_items),),
+        )
+        for r in cur.fetchall():
+            activity_items.append(
+                {
+                    "id": r[0],
+                    "type": r[1],
+                    "employeeId": r[2],
+                    "alias": r[3],
+                    "role": r[4],
+                    "dept": r[5],
+                    "content": r[6],
+                    "timestamp": r[7],
+                }
+            )
+        conn.close()
+
+    # Sort by timestamp descending, take top `limit`
+    activity_items.sort(key=lambda x: x["timestamp"], reverse=True)
+    return activity_items[:limit]
+
+
+# ── PiAgent Execute ────────────────────────────────────────────
+
+
+@app.post("/api/ops/execute")
+def execute_task(req: dict, _: bool = Depends(verify_api_key)):
+    """
+    Execute a task via PiAgent (openclaw CLI) and record the result.
+    Returns the PiAgent execution result plus the internal exec_id.
+    """
+    message = req.get("message")
+    if not message:
+        raise HTTPException(status_code=400, detail="message is required")
+
+    agent_id = req.get("blueprint_id", "av-swe-001")
+    bp_id = agent_id
+    alias = req.get("alias", "码哥")
+    role = req.get("role", "软件工程师")
+    dept = req.get("dept", "技术研发部")
+
+    raw = _run_piagent(message, agent_id, timeout=120)
+
+    # Usage is at raw["result"]["meta"]["agentMeta"]["usage"]
+    meta = raw.get("result", {}).get("meta", {})
+    usage = meta.get("agentMeta", {}).get("usage", {})
+    token_input = usage.get("input", 0)
+    token_analysis = usage.get("cacheRead", 0)
+    token_completion = usage.get("output", 0)
+    status = raw.get("status", "ok")
+    run_id = raw.get("runId", "")
+    summary = raw.get("summary", "")
+    duration_ms = meta.get("durationMs", 0)
+
+    if run_id:
+        exec_id = record_execution(
+            run_id=run_id,
+            blueprint_id=bp_id,
+            alias=alias,
+            role=role,
+            dept=dept,
+            message=message,
+            status=status,
+            token_input=token_input,
+            token_analysis=token_analysis,
+            token_completion=token_completion,
+            duration_ms=duration_ms,
+            summary=summary[:200] if summary else "",
+        )
+    else:
+        exec_id = None
+
+    return {
+        "execId": exec_id,
+        "runId": run_id,
+        "status": status,
+        "summary": summary,
+        "tokenInput": token_input,
+        "tokenAnalysis": token_analysis,
+        "tokenCompletion": token_completion,
+        "tokenTotal": token_input + token_analysis + token_completion,
+        "durationMs": duration_ms,
+    }
+
+
+# ── Onboarding ────────────────────────────────────────────────
+
+
+@app.get("/api/onboarding/blueprints")
+def get_blueprints(_: bool = Depends(verify_api_key)):
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, role, alias, department, versions, capacity FROM blueprints")
+    rows = cur.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r[0],
+            "role": r[1],
+            "alias": r[2],
+            "department": r[3],
+            "versions": json.loads(r[4]),
+            "capacity": json.loads(r[5]),
+        }
+        for r in rows
+    ]
+
+
+@app.post("/api/onboarding/deploy")
+def deploy_avatar(req: dict, _: bool = Depends(verify_api_key)):
+    """Deploy a new avatar and auto-create openclaw agent directory."""
+    bp_id = f"av-{req['role']}-{int(time.time())}"
+    scaling = req["scaling"]
+    soul = req.get("soul", {})
+    new_version = {
+        "version": "v1.0.0",
+        "status": "published",
+        "traffic": 100,
+        "replicas": scaling["minReplicas"],
+        "config": {
+            "soul": soul,
+            "skills": req.get("skills", []),
+            "tools": req.get("tools", []),
+            "model": req.get("model", ""),
+        },
+        "scaling": scaling,
+    }
+
+    # Create openclaw agent
+    openclaw_dir = Path(os.environ.get("OPENCLAW_DIR", str(os.path.expanduser("~/.openclaw"))))
+    agents_dir = openclaw_dir / "agents"
+    registry = OpenclawAgentRegistry(openclaw_dir=openclaw_dir, agents_dir=agents_dir)
+    try:
+        registry.register_agent(
+            blueprint_id=bp_id,
+            alias=req["alias"],
+            role=req["role"],
+            department=req["department"],
+            soul=soul,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create openclaw agent: {e}")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO blueprints (id, role, alias, department, versions, capacity) VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            bp_id,
+            req["role"],
+            req["alias"],
+            req["department"],
+            json.dumps([new_version]),
+            json.dumps({"used": scaling["minReplicas"], "max": scaling["maxReplicas"]}),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "id": bp_id,
+        "role": req["role"],
+        "alias": req["alias"],
+        "department": req["department"],
+        "versions": [new_version],
+        "capacity": {"used": scaling["minReplicas"], "max": scaling["maxReplicas"]},
+    }
+
+
+@app.put("/api/onboarding/blueprints/{bp_id}/traffic")
+def update_traffic(bp_id: str, req: dict, _: bool = Depends(verify_api_key)):
+    """更新指定版本的 traffic 权重。"""
+    version_idx = req.get("version_index")
+    new_traffic = req.get("traffic")
+    if new_traffic is None or version_idx is None:
+        raise HTTPException(status_code=400, detail="version_index and traffic are required")
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, versions, capacity FROM blueprints WHERE id = ?", (bp_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Blueprint not found")
+
+    versions = json.loads(row[1])
+    if version_idx < 0 or version_idx >= len(versions):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid version_index")
+
+    versions[version_idx]["traffic"] = new_traffic
+
+    total_used = sum(v["replicas"] for v in versions if v["traffic"] > 0)
+    capacity = json.loads(row[2])
+    capacity["used"] = total_used
+
+    cur.execute(
+        "UPDATE blueprints SET versions = ?, capacity = ? WHERE id = ?",
+        (json.dumps(versions), json.dumps(capacity), bp_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"id": bp_id, "versions": versions, "capacity": capacity}
+
+
+@app.put("/api/onboarding/blueprints/{bp_id}/versions/{idx}/deprecate")
+def deprecate_version(bp_id: str, idx: int, _: bool = Depends(verify_api_key)):
+    """将指定版本下线（traffic=0, status=deprecated）。"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id, versions, capacity FROM blueprints WHERE id = ?", (bp_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Blueprint not found")
+
+    versions = json.loads(row[1])
+    if idx < 0 or idx >= len(versions):
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid version index")
+
+    versions[idx]["traffic"] = 0
+    versions[idx]["status"] = "deprecated"
+
+    total_used = sum(v["replicas"] for v in versions if v["traffic"] > 0)
+    capacity = json.loads(row[2])
+    capacity["used"] = total_used
+
+    cur.execute(
+        "UPDATE blueprints SET versions = ?, capacity = ? WHERE id = ?",
+        (json.dumps(versions), json.dumps(capacity), bp_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return {"id": bp_id, "versions": versions, "capacity": capacity}
+
+
+@app.delete("/api/onboarding/blueprints/{bp_id}")
+def delete_blueprint(bp_id: str, _: bool = Depends(verify_api_key)):
+    """Delete blueprint and its openclaw agent directory."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM blueprints WHERE id = ?", (bp_id,))
+    if not cur.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Blueprint not found")
+    cur.execute("DELETE FROM blueprints WHERE id = ?", (bp_id,))
+    conn.commit()
+    conn.close()
+
+    # Clean up openclaw agent
+    openclaw_dir = Path(os.environ.get("OPENCLAW_DIR", str(os.path.expanduser("~/.openclaw"))))
+    agents_dir = openclaw_dir / "agents"
+    registry = OpenclawAgentRegistry(openclaw_dir=openclaw_dir, agents_dir=agents_dir)
+    registry.remove_agent(bp_id)
+
+    return {"deleted": bp_id}

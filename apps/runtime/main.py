@@ -5,12 +5,13 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from apps.runtime.executor import RuntimeExecutor
@@ -38,6 +39,7 @@ executors: Dict[str, RuntimeExecutor] = {}
 _task_store: Dict[str, Dict[str, Any]] = {}
 
 RUNTIME_VERSION = "0.1.0"
+RUNTIME_TIMEOUT = int(os.environ.get("RUNTIME_TIMEOUT", "300"))
 
 
 def _get_or_create_executor(employee_id: str, task_id: str) -> RuntimeExecutor:
@@ -120,55 +122,19 @@ async def health_check() -> HealthResponse:
     )
 
 
-@app.post("/runtime/execute", response_model=ExecuteResponse, tags=["执行"])
-async def execute_task(req: ExecuteRequest, request: Request) -> ExecuteResponse:
-    task_id = req.task_id or f"task-{uuid.uuid4().hex[:8]}"
-    trace_id = new_trace_id()
-    _store_task(task_id, "queued", req.employee_id, trace_id=trace_id)
+async def _execute_task(task_id: str, query: str, skill_names: list[str], employee_id: str) -> None:
+    """Background helper that runs the actual agent execution."""
+    import asyncio
 
-    executor = _get_or_create_executor(req.employee_id, task_id=task_id)
+    trace_id = _task_store.get(task_id, {}).get("trace_id", new_trace_id())
+    log = get_logger("runtime")
     _update_task(task_id, status="running", started_at=datetime.now(timezone.utc))
 
+    executor = _get_or_create_executor(employee_id, task_id=task_id)
+
     try:
-        # 获取 query
-        query = ""
-        if isinstance(req.input, TaskInput):
-            query = req.input.query
-        elif isinstance(req.input, dict):
-            query = req.input.get("query", "")
-        else:
-            query = str(req.input)
+        result = await asyncio.wait_for(executor.run(query, skill_names), timeout=RUNTIME_TIMEOUT)
 
-        # 提取技能列表
-        available_skills: list[str] = []
-        if req.context:
-            available_skills = req.context.skills
-
-        import asyncio
-        from concurrent.futures import ThreadPoolExecutor
-        from concurrent.futures import TimeoutError as FUTimeoutError
-
-        loop = asyncio.get_event_loop()
-        # 这里为了演示简单使用同步等待。实际生产中应该使用 background tasks
-        with ThreadPoolExecutor(max_workers=1) as pool:
-            try:
-                # 调用 executor.run(task_content, available_skills)
-                result = pool.submit(lambda: loop.run_until_complete(executor.run(query, available_skills))).result(
-                    timeout=30
-                )
-            except FUTimeoutError:
-                _update_task(task_id, status="failed")
-                return ExecuteResponse(
-                    task_id=task_id,
-                    status=TaskStatus.FAILED,
-                    result=TaskResult(error="Task execution timed out"),
-                    trace_id=trace_id,
-                    duration_ms=30000,
-                )
-
-        _update_task(task_id, status="completed", completed_at=datetime.now(timezone.utc))
-
-        # 兼容处理返回结果
         answer = ""
         sources: list[Any] = []
         actions: list[Any] = []
@@ -179,26 +145,58 @@ async def execute_task(req: ExecuteRequest, request: Request) -> ExecuteResponse
         else:
             answer = str(result)
 
-        return ExecuteResponse(
-            task_id=task_id,
-            status=TaskStatus.COMPLETED,
-            result=TaskResult(
-                answer=answer,
-                sources=sources,
-                actions=actions,
-            ),
-            trace_id=trace_id,
-            duration_ms=0,
+        _update_task(
+            task_id,
+            status="completed",
+            completed_at=datetime.now(timezone.utc),
+            result=TaskResult(answer=answer, sources=sources, actions=actions),
         )
-
+        log.info("task_completed", task_id=task_id, trace_id=trace_id)
+    except asyncio.TimeoutError:
+        _update_task(
+            task_id,
+            status="failed",
+            completed_at=datetime.now(timezone.utc),
+            result=TaskResult(error="Task execution timed out"),
+        )
+        log.warning("task_timeout", task_id=task_id, trace_id=trace_id, timeout=RUNTIME_TIMEOUT)
     except Exception as e:
-        _update_task(task_id, status="failed")
-        return ExecuteResponse(
-            task_id=task_id,
-            status=TaskStatus.FAILED,
+        _update_task(
+            task_id,
+            status="failed",
+            completed_at=datetime.now(timezone.utc),
             result=TaskResult(error=str(e)),
-            trace_id=trace_id,
         )
+        log.error("task_failed", task_id=task_id, trace_id=trace_id, error=str(e), exc_info=True)
+
+
+@app.post("/runtime/execute", response_model=ExecuteResponse, tags=["执行"])
+async def execute_task(req: ExecuteRequest, request: Request, background_tasks: BackgroundTasks) -> ExecuteResponse:
+    task_id = req.task_id or f"task-{uuid.uuid4().hex[:8]}"
+    trace_id = new_trace_id()
+    _store_task(task_id, "queued", req.employee_id, trace_id=trace_id)
+
+    query = ""
+    if isinstance(req.input, TaskInput):
+        query = req.input.query
+    elif isinstance(req.input, dict):
+        query = req.input.get("query", "")
+    else:
+        query = str(req.input)
+
+    available_skills: list[str] = []
+    if req.context:
+        available_skills = req.context.skills
+
+    background_tasks.add_task(_execute_task, task_id, query, available_skills, req.employee_id)
+
+    return ExecuteResponse(
+        task_id=task_id,
+        status=TaskStatus.QUEUED,
+        result=TaskResult(answer="Task queued for execution"),
+        trace_id=trace_id,
+        duration_ms=0,
+    )
 
 
 @app.post("/runtime/plan", response_model=PlanResponse, tags=["计划"])
@@ -242,6 +240,7 @@ async def get_status(task_id: str, request: Request) -> StatusResponse:
     if total_steps > 0:
         progress = float(current_step) / total_steps
 
+    completed_result = task.get("result")
     return StatusResponse(
         task_id=task_id,
         status=TaskStatus(task["status"]),
@@ -252,6 +251,7 @@ async def get_status(task_id: str, request: Request) -> StatusResponse:
         estimated_finish_at=None,
         steps=task.get("steps", []),
         trace_id=task.get("trace_id"),
+        result=completed_result,
     )
 
 
