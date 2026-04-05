@@ -548,9 +548,17 @@ def get_recent_executions(limit: int = 10):
     )
     rows = [
         {
-            "id": r[0], "blueprint_id": r[1], "alias": r[2], "role": r[3],
-            "dept": r[4], "message": r[5], "status": r[6], "token_total": r[7],
-            "duration_ms": r[8], "summary": r[9], "created_at": r[10],
+            "id": r[0],
+            "blueprint_id": r[1],
+            "alias": r[2],
+            "role": r[3],
+            "dept": r[4],
+            "message": r[5],
+            "status": r[6],
+            "token_total": r[7],
+            "duration_ms": r[8],
+            "summary": r[9],
+            "created_at": r[10],
         }
         for r in cur.fetchall()
     ]
