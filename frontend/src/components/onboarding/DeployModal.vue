@@ -13,6 +13,8 @@ const emit = defineEmits(['close', 'deploy']);
 const selectedRole = ref(props.blueprints[0]?.role || '');
 const alias = ref('');
 const department = ref(props.departments[0] || '');
+const soulDescription = ref('');
+const soulCommunicationStyle = ref('');
 const minReplicas = ref(1);
 const maxReplicas = ref(5);
 const targetLoad = ref(60);
@@ -29,6 +31,10 @@ function handleDeploy() {
     role: selectedRole.value,
     alias: alias.value || defaultAlias.value,
     department: department.value,
+    soul: {
+      description: soulDescription.value || '',
+      communication_style: soulCommunicationStyle.value || '',
+    },
     scaling: {
       minReplicas: minReplicas.value,
       maxReplicas: maxReplicas.value,
@@ -75,6 +81,31 @@ function handleDeploy() {
           <select v-model="department" class="field-select">
             <option v-for="d in departments" :key="d" :value="d">{{ d }}</option>
           </select>
+        </div>
+
+        <!-- 人格设定 -->
+        <div class="field-group">
+          <div class="field-group-label">
+            <span>人格设定</span>
+          </div>
+
+          <div class="field">
+            <label class="field-label">角色灵魂描述</label>
+            <input
+              v-model="soulDescription"
+              class="field-input"
+              placeholder="如：热情友好，专业细致"
+            />
+          </div>
+
+          <div class="field">
+            <label class="field-label">沟通风格</label>
+            <input
+              v-model="soulCommunicationStyle"
+              class="field-input"
+              placeholder="如：亲切简洁，条理分明"
+            />
+          </div>
         </div>
 
         <!-- 分身策略 -->

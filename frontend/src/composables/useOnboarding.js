@@ -83,7 +83,19 @@ function deprecateVersion(blueprintId, versionIndex) {
     });
 }
 
-function deployNewAvatar({ role, alias, department, scaling }) {
+async function deployNewAvatar({ role, alias, department, soul, scaling }) {
+  try {
+    const res = await onboardingApi.deploy({
+      role, alias, department, soul, scaling,
+    });
+    if (res.data) {
+      blueprints.value.push(res.data);
+      return;
+    }
+  } catch {
+    // API 不可用时的回退（mock 或离线）
+  }
+  // 乐观更新
   const id = `av-${role}-${Date.now()}`;
   blueprints.value.push({
     id,
@@ -96,7 +108,7 @@ function deployNewAvatar({ role, alias, department, scaling }) {
         status: 'published',
         traffic: 100,
         replicas: scaling.minReplicas,
-        config: { soul: {}, skills: [], tools: [], model: '' },
+        config: { soul: soul || {}, skills: [], tools: [], model: '' },
         scaling,
       },
     ],
