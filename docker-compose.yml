@@ -1,0 +1,247 @@
+# docker-compose.yml — local development environment
+#
+# Usage:
+#   docker compose up           # start all services
+#   docker compose up -d       # start in background
+#   docker compose down        # stop all
+#
+# Services are exposed on their configured ports:
+#   Gateway:        http://localhost:8000
+#   Runtime:        http://localhost:8001
+#   ModelHub:       http://localhost:8002
+#   ConnectorHub:   http://localhost:8003
+#   SkillHub:       http://localhost:8004
+#   KnowledgeHub:   http://localhost:8005
+#   OpsCenter:      http://localhost:8006
+#   Governance:     http://localhost:8007
+#   ConfigCenter:   http://localhost:8008
+#
+# All services share a virtual network `e-agent-os-net`.
+
+version: "3.9"
+
+networks:
+  e-agent-os-net:
+    driver: bridge
+
+services:
+  # -------------------- Gateway --------------------
+  gateway:
+    build:
+      context: .
+      target: runtime
+      args:
+        SERVICE_PORT: "8000"
+    ports:
+      - "8000:8000"
+    environment:
+      SERVICE_PORT: "8000"
+      RUNTIME_URL: "http://runtime:8001"
+      SECRET_KEY: "${SECRET_KEY:-dev-secret-key-change-in-production}"
+    networks:
+      - e-agent-os-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- Runtime --------------------
+  runtime:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8001"
+      MODEL_HUB_URL: "http://model-hub:8002"
+      SKILL_HUB_URL: "http://skill-hub:8004"
+      CONNECTOR_HUB_URL: "http://connector-hub:8003"
+      KNOWLEDGE_HUB_URL: "http://knowledge-hub:8005"
+      GOVERNANCE_URL: "http://governance:8007"
+      PIAGENT_SIDECAR_HTTP_PORT: "8090"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      MODEL_HUB_ENABLED: "${MODEL_HUB_ENABLED:-true}"
+      KNOWLEDGE_RAG_ENABLED: "${KNOWLEDGE_RAG_ENABLED:-true}"
+    networks:
+      - e-agent-os-net
+    depends_on:
+      - redis
+      - piagent-sidecar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- ModelHub --------------------
+  model-hub:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8002"
+      PIAGENT_HTTP_PORT: "8090"
+      MINIMAX_API_KEY: "${MINIMAX_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    ports:
+      - "8002:8002"
+    networks:
+      - e-agent-os-net
+    depends_on:
+      - piagent-sidecar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/model-hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- ConnectorHub --------------------
+  connector-hub:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8003"
+    ports:
+      - "8003:8003"
+    networks:
+      - e-agent-os-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/connector-hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- SkillHub --------------------
+  skill-hub:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8004"
+    ports:
+      - "8004:8004"
+    networks:
+      - e-agent-os-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/skill-hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- KnowledgeHub --------------------
+  knowledge-hub:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8005"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+    ports:
+      - "8005:8005"
+    networks:
+      - e-agent-os-net
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/knowledge-hub/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- OpsCenter --------------------
+  ops-center:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8006"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379/0}"
+    ports:
+      - "8006:8006"
+    networks:
+      - e-agent-os-net
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/ops-center/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- Governance --------------------
+  governance:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8007"
+      JWT_SECRET: "${JWT_SECRET:-change-me-in-production}"
+      JWT_ALGORITHM: "HS256"
+      JWT_EXPIRY_SECONDS: "3600"
+    ports:
+      - "8007:8007"
+    networks:
+      - e-agent-os-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8007/governance/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- ConfigCenter --------------------
+  config-center:
+    build:
+      context: .
+      target: runtime
+    environment:
+      SERVICE_PORT: "8008"
+    ports:
+      - "8008:8008"
+    networks:
+      - e-agent-os-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8008/config-center/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # -------------------- PiAgent Sidecar --------------------
+  piagent-sidecar:
+    image: node:20-alpine
+    working_dir: /app
+    command: >
+      sh -c "echo 'PiAgent sidecar placeholder — compile TypeScript and run' && exit 1"
+    # TODO: Replace with actual sidecar image when pi-mono is built:
+    # command: node dist/index.js
+    environment:
+      PIAGENT_HTTP_PORT: "8090"
+      MINIMAX_API_KEY: "${MINIMAX_API_KEY:-}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    networks:
+      - e-agent-os-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8090"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # -------------------- Redis --------------------
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - e-agent-os-net
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  redis-data:
