@@ -77,15 +77,19 @@ def _eval_condition(value: float, condition: str, threshold: float) -> bool:
 
 def register_rule(rule: AlertRule) -> None:
     """Register an alert rule."""
+    print(f"REGISTER_RULE CALLED: {rule.id}, _active_rules id={id(_active_rules)}, current len={len(_active_rules)}", flush=True)
     with _lock:
         _active_rules[rule.id] = rule
+    print(f"REGISTER_RULE DONE: {rule.id}, _active_rules id={id(_active_rules)}, new len={len(_active_rules)}", flush=True)
     log.info("alert.rule.registered", rule_id=rule.id, name=rule.name)
 
 
 def list_rules() -> List[AlertRule]:
     """Return all alert rules."""
     with _lock:
-        return list(_active_rules.values())
+        result = list(_active_rules.values())
+    print(f"LIST_RULES: _active_rules id={id(_active_rules)}, len={len(result)}, keys={list(_active_rules.keys())}", flush=True)
+    return result
 
 
 def evaluate_rules() -> List[Alert]:
