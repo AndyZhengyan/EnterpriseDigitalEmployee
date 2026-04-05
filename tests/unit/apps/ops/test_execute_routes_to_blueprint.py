@@ -52,8 +52,8 @@ def test_execute_uses_blueprint_id_param(tmp_path, monkeypatch):
         )
 
 
-def test_execute_defaults_to_none_when_no_blueprint_id(tmp_path, monkeypatch):
-    """POST /api/ops/execute without blueprint_id passes None (letting openclaw pick)."""
+def test_execute_defaults_to_av_swe_when_no_blueprint_id(tmp_path, monkeypatch):
+    """POST /api/ops/execute without blueprint_id defaults to av-swe-001."""
     _init_test_db(tmp_path, monkeypatch)
 
     from apps.ops.main import app
@@ -79,9 +79,9 @@ def test_execute_defaults_to_none_when_no_blueprint_id(tmp_path, monkeypatch):
         assert resp.status_code == 200
         mock_run.assert_called_once()
         call_args = mock_run.call_args
-        # agent_id should be None (no blueprint_id in request)
-        assert call_args[0][1] is None, (
-            f"Expected agent_id=None, got {call_args[0][1]!r}"
+        # agent_id defaults to "av-swe-001" when no blueprint_id in request
+        assert call_args[0][1] == "av-swe-001", (
+            f"Expected agent_id='av-swe-001', got {call_args[0][1]!r}"
         )
 
 
