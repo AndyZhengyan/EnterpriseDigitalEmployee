@@ -5,9 +5,10 @@ from __future__ import annotations
 import pytest
 
 from apps.ops_center.engine import (
+    _auto_seed,
+    _active_rules,
     _eval_condition,
     _firing_alerts,
-    _active_rules,
     evaluate_rules,
     get_rule,
     list_firing_alerts,
@@ -106,15 +107,8 @@ class TestAlertEngine:
 
     def test_builtin_rules_registered(self):
         _reset()
-        from apps.ops_center.engine import _auto_seed, _BUILTIN_RULES, _active_rules
-
-        print(f"TEST: after _reset, _active_rules id={id(_active_rules)}, len={len(_active_rules)}", flush=True)
-        assert len(_BUILTIN_RULES) >= 3, f"DEBUG: _BUILTIN_RULES has {len(_BUILTIN_RULES)} items"
         _auto_seed()
-        print(f"TEST: after _auto_seed, _active_rules id={id(_active_rules)}, len={len(_active_rules)}, keys={list(_active_rules.keys())}", flush=True)
-        result = list_rules()
-        print(f"TEST: list_rules() returned len={len(result)}", flush=True)
-        assert len(result) >= 3, f"DEBUG: after _auto_seed, list_rules() returned {len(result)} rules: {[r.id for r in result]}"  # At least 3 built-in rules
+        assert len(list_rules()) >= 3  # At least 3 built-in rules
 
 
 class TestEvalCondition:
