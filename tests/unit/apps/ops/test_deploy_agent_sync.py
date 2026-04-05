@@ -6,13 +6,12 @@ from fastapi.testclient import TestClient
 
 def _init_test_db(tmp_path, monkeypatch):
     """Set up the temp DB with schema before TestClient triggers startup()."""
-    import os
     monkeypatch.setenv("OPS_DB_PATH", str(tmp_path / "ops.db"))
     monkeypatch.setattr("apps.ops.db.DB_PATH", str(tmp_path / "ops.db"))
     # Force DB_PATH recompute by reloading the module-level variable
     from apps.ops import db as db_module
     db_module.DB_PATH = str(tmp_path / "ops.db")
-    from apps.ops.db import init_db, get_db
+    from apps.ops.db import get_db, init_db
     init_db()
     conn = get_db()
     conn.close()

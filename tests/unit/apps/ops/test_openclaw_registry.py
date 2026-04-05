@@ -1,7 +1,5 @@
 # tests/unit/apps/ops/test_openclaw_registry.py
 import json
-import shutil
-from pathlib import Path
 
 import pytest
 

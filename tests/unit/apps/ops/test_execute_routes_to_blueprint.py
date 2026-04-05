@@ -12,7 +12,7 @@ def _init_test_db(tmp_path, monkeypatch):
     monkeypatch.setenv("PIAGENT_CLI_STUB", "true")
     from apps.ops import db as db_module
     db_module.DB_PATH = str(tmp_path / "ops.db")
-    from apps.ops.db import init_db, get_db
+    from apps.ops.db import get_db, init_db
     init_db()
     conn = get_db()
     conn.close()
@@ -96,7 +96,6 @@ def test_demo_scheduler_uses_blueprint_id(tmp_path, monkeypatch):
 
     # Track which agent_ids were passed to _run_piagent across all invocations
     captured_agent_ids = []
-    original_run = ops_main._run_piagent
 
     def track_run(message, agent_id, timeout=60):
         captured_agent_ids.append(agent_id)

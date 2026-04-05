@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Clear all runtime data from ops database, keeping only schema."""
 import os
-import sys
 
 DB_PATH = os.environ.get("OPS_DB_PATH", os.path.join(os.path.dirname(__file__), "..", "..", "data", "ops.db"))
 
