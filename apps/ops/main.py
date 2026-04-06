@@ -46,6 +46,7 @@ def _force_dev_mode() -> None:
     global _key_manager
     if _key_manager is not None:
         import sqlite3
+
         conn = sqlite3.connect(_key_manager.db_path)
         conn.execute("UPDATE api_keys SET is_active = 0 WHERE is_active = 1")
         conn.commit()
