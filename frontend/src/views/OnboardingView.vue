@@ -1,7 +1,7 @@
 <!-- frontend/src/views/OnboardingView.vue -->
 <!-- e-Agent-OS OpCenter — 入职中心 -->
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useOnboarding } from '../composables/useOnboarding.js';
 import AvatarCard from '../components/onboarding/AvatarCard.vue';
 import DeployModal from '../components/onboarding/DeployModal.vue';
@@ -10,7 +10,12 @@ const {
   blueprints,
   departments,
   deployNewAvatar,
+  fetchBlueprints,
 } = useOnboarding();
+
+onMounted(() => {
+  fetchBlueprints();
+});
 
 const showModal = ref(false);
 

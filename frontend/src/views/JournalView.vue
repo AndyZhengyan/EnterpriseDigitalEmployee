@@ -3,7 +3,7 @@
 <template>
   <div class="page">
     <div class="page-placeholder">
-      <p class="placeholder-title">审计中心</p>
+      <p class="placeholder-title">工作日记</p>
       <p class="placeholder-sub">操作审计 · 思考链回溯</p>
     </div>
   </div>

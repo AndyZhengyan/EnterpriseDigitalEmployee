@@ -7,14 +7,14 @@ import {
   MOCK_STATUS_DIST,
   MOCK_TOKEN_TREND,
   MOCK_TASK_TREND,
-  MOCK_TASK_DETAIL,
-  MOCK_TOKEN_DAILY,
-  MOCK_CAPABILITY_DIST,
   MOCK_ACTIVITY,
 } from '../mock/data.js';
-import { MOCK_BLUEPRINTS, DEPARTMENTS } from '../mock/blueprints.js';
+import {
+  MOCK_BLUEPRINTS,
+  DEPARTMENTS,
+} from '../mock/blueprints.js';
 
-const USE_MOCK = false; // 切换为真实后端
+const USE_MOCK = true; // flip to false when connecting to real backend
 
 const api = axios.create({
   baseURL: '/api',
@@ -66,20 +66,40 @@ function mockGetActivity({ limit = 10 } = {}) {
   return Promise.resolve({ data: MOCK_ACTIVITY.slice(0, limit) });
 }
 
-function mockGetTaskDetail() {
-  return Promise.resolve({ data: MOCK_TASK_DETAIL });
-}
-
-function mockGetTokenDaily() {
-  return Promise.resolve({ data: MOCK_TOKEN_DAILY });
-}
-
-function mockGetCapabilityDist() {
-  return Promise.resolve({ data: MOCK_CAPABILITY_DIST });
-}
-
 function mockGetBlueprints() {
-  return Promise.resolve({ data: [...MOCK_BLUEPRINTS] });
+  return Promise.resolve({ data: MOCK_BLUEPRINTS });
+}
+
+function mockDeploy(payload) {
+  const id = `av-${payload.role}-${Date.now()}`;
+  return Promise.resolve({
+    data: {
+      id,
+      role: payload.role,
+      alias: payload.alias || payload.role,
+      department: payload.department,
+      versions: [
+        {
+          version: 'v1.0.0',
+          status: 'published',
+          traffic: 100,
+          replicas: payload.scaling?.minReplicas ?? 1,
+          config: { soul: payload.soul || {}, skills: [], tools: [], model: '' },
+          scaling: payload.scaling || { minReplicas: 1, maxReplicas: 5, targetLoad: 70 },
+        },
+      ],
+      capacity: {
+        used: payload.scaling?.minReplicas ?? 1,
+        max: payload.scaling?.maxReplicas ?? 5,
+      },
+    },
+  });
+}
+
+function mockAdjustTraffic(blueprintId, versionIndex, traffic) {
+  return Promise.resolve({
+    data: { blueprintId, versionIndex, traffic },
+  });
 }
 
 // ---- Public API Functions ----
@@ -100,37 +120,40 @@ export const dashboardApi = {
     USE_MOCK ? mockGetTokenTrend() : api.get('/dashboard/token-trend'),
   taskTrend: () =>
     USE_MOCK ? mockGetTaskTrend() : api.get('/dashboard/task-trend'),
-  taskDetail: () =>
-    USE_MOCK ? mockGetTaskDetail() : api.get('/dashboard/task-detail'),
-  tokenDaily: () =>
-    USE_MOCK ? mockGetTokenDaily() : api.get('/dashboard/token-daily'),
-  capabilityDist: () =>
-    USE_MOCK ? mockGetCapabilityDist() : api.get('/dashboard/capability-dist'),
   activity: (params) =>
-    USE_MOCK ? mockGetActivity(params) : api.get('/dashboard/activity', { params }),
+    USE_MOCK ? mockGetActivity(params) : api.get('/activity', { params }),
+};
+
+export const opsApi = {
+  execute: (payload) =>
+    USE_MOCK
+      ? Promise.resolve({
+          data: {
+            status: 'ok',
+            summary: 'mock',
+            tokenTotal: 100,
+            durationMs: 2000,
+          },
+        })
+      : api.post('/ops/execute', payload),
 };
 
 export const onboardingApi = {
   list: () =>
     USE_MOCK ? mockGetBlueprints() : api.get('/onboarding/blueprints'),
   deploy: (payload) =>
-    USE_MOCK ? Promise.resolve({ data: null }) : api.post('/onboarding/deploy', payload),
-  // Phase 2 新增：
+    USE_MOCK ? mockDeploy(payload) : api.post('/onboarding/deploy', payload),
   adjustTraffic: (blueprintId, versionIndex, traffic) =>
-    api.put(`/onboarding/blueprints/${blueprintId}/traffic`, {
-      version_index: versionIndex,
-      traffic,
-    }),
+    USE_MOCK
+      ? mockAdjustTraffic(blueprintId, versionIndex, traffic)
+      : api.put(`/onboarding/blueprints/${blueprintId}/traffic`, {
+          versionIndex,
+          traffic,
+        }),
   deprecateVersion: (blueprintId, versionIndex) =>
-    api.put(`/onboarding/blueprints/${blueprintId}/versions/${versionIndex}/deprecate`),
-  deleteBlueprint: (blueprintId) =>
-    api.delete(`/onboarding/blueprints/${blueprintId}`),
-};
-
-export const opsApi = {
-  execute: (payload) =>
-    USE_MOCK ? Promise.resolve({ data: { status: 'ok', summary: 'mock', tokenTotal: 100, durationMs: 2000 } })
-      : api.post('/ops/execute', payload),
+    api.put(`/onboarding/blueprints/${blueprintId}/deprecate`, {
+      versionIndex,
+    }),
 };
 
 export { DEPARTMENTS };

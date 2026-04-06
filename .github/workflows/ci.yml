@@ -67,6 +67,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          # No npm cache — no package-lock.json at repo root
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -91,13 +92,9 @@ jobs:
           .venv/bin/uvicorn apps.ops.main:app --port 8002 &
           sleep 3
 
-      - name: Build & serve frontend
-        run: |
-          cd frontend && npm run build
-          npx serve dist -l 5173 &
-          sleep 2
-
       - name: Run E2E tests
+        # Playwright's webServer config (in playwright.config.ts) starts the dev server
+        # automatically in CI mode (reuseExistingServer: false). No manual serve needed.
         run: |
           cd frontend
           npx playwright test --project=chromium

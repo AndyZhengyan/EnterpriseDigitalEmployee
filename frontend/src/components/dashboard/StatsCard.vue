@@ -22,7 +22,6 @@ function formatValue(type, val) {
 
 function unitSuffix(type, val) {
   if (type === 'percent' || type === 'load') return '%';
-  if (type === 'efficiency') return '任务/M';
   if (typeof val === 'number' && val >= 1_000_000) return 'M';
   if (typeof val === 'number' && val >= 1_000) return 'K';
   return '';

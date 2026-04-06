@@ -10,7 +10,7 @@ const navItems = [
   { label: '入职中心', path: '/onboarding' },
   { label: '赋能中心', path: '/enablement' },
   { label: '档案中心', path: '/oracle' },
-  { label: '审计中心', path: '/journal' },
+  { label: '工作日记', path: '/journal' },
 ];
 
 function isActive(path) {
@@ -28,8 +28,7 @@ function isActive(path) {
           <circle cx="13" cy="8" r="4.5" fill="currentColor"/>
           <path d="M4 23c0-5 4-9 9-9s9 4 9 9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
-        <span class="logo-text">AvatarOS</span>
-        <span class="logo-sub">企业数字员工中心</span>
+        <span class="logo-text">e-Agent-OS</span>
       </router-link>
     </div>
 
@@ -95,16 +94,6 @@ function isActive(path) {
   font-weight: 500;
   color: var(--text-primary);
   letter-spacing: -0.3px;
-}
-
-.logo-sub {
-  font-size: 10px;
-  color: var(--text-disabled);
-  letter-spacing: 0.03em;
-  padding-left: 6px;
-  border-left: 1px solid var(--border-subtle);
-  margin-left: 6px;
-  line-height: 1;
 }
 
 .topnav-center {

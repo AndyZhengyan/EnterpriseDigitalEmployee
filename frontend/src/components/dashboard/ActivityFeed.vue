@@ -29,12 +29,7 @@ function relativeTime(iso) {
   <div class="activity-feed">
     <div class="feed-title">最近动态</div>
     <ul class="feed-list">
-      <li
-        v-for="item in items"
-        :key="item.id"
-        class="feed-item"
-        :class="{ 'feed-item--failed': item.type === 'task_failed' }"
-      >
+      <li v-for="item in items" :key="item.id" class="feed-item">
         <span class="feed-timeline">
           <span
             class="feed-dot"
@@ -42,13 +37,8 @@ function relativeTime(iso) {
           ></span>
         </span>
         <div class="feed-body">
-          <div class="feed-avatar">
-            <span class="feed-alias">{{ item.alias }}</span>
-            <span class="feed-role">{{ item.role }} — {{ item.dept }}</span>
-          </div>
-          <div class="feed-content" :class="{ 'feed-content--failed': item.type === 'task_failed' }">
-            {{ item.content }}
-          </div>
+          <span class="feed-name">{{ item.employeeName }}</span>
+          <span class="feed-content">{{ item.content }}</span>
         </div>
         <span class="feed-time">{{ relativeTime(item.timestamp) }}</span>
       </li>
@@ -64,20 +54,6 @@ function relativeTime(iso) {
   border: 1px solid var(--border-subtle);
   padding: 16px 18px;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.feed-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  max-height: 320px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-medium) transparent;
 }
 
 .feed-title {
@@ -87,7 +63,14 @@ function relativeTime(iso) {
   text-transform: uppercase;
   color: var(--text-disabled);
   margin-bottom: 14px;
-  flex-shrink: 0;
+}
+
+.feed-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .feed-item {
@@ -119,45 +102,21 @@ function relativeTime(iso) {
 .feed-body {
   flex: 1;
   font-size: 13px;
-  line-height: 1.7;
+  line-height: 1.75;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.feed-avatar {
-  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 6px;
 }
 
-.feed-alias {
-  font-family: var(--font-serif);
-  font-size: 14px;
-  font-weight: 500;
+.feed-name {
+  font-weight: 600;
   color: var(--text-primary);
-  white-space: nowrap;
-}
-
-.feed-role {
-  font-size: 11px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-right: 5px;
 }
 
 .feed-content {
   color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.feed-content--failed {
-  color: var(--danger);
-}
-
-.feed-item--failed .feed-dot {
-  box-shadow: 0 0 0 2px rgba(184, 74, 60, 0.20);
+  font-size: 13px;
 }
 
 .feed-time {
