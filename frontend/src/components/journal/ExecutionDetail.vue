@@ -103,7 +103,7 @@ function formatToken(n) {
 
       <!-- 原始输入 -->
       <div class="code-block">
-        <pre>{{ item.input }}</pre>
+        <pre>{{ item.input ?? '' }}</pre>
       </div>
 
       <!-- 分割线 -->
@@ -113,7 +113,7 @@ function formatToken(n) {
 
       <!-- 输出摘要 -->
       <div class="code-block output-block">
-        <pre>{{ item.summary }}</pre>
+        <pre>{{ item.summary ?? '' }}</pre>
       </div>
     </template>
   </div>

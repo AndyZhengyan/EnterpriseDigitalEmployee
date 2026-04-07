@@ -70,7 +70,7 @@ function statusIcon(status) {
     <div class="card-footer">
       <span class="card-stat">
         <span class="stat-label">Token</span>
-        <span class="stat-value">{{ item.tokenTotal.toLocaleString() }}</span>
+        <span class="stat-value">{{ (item.tokenTotal ?? 0).toLocaleString() }}</span>
       </span>
       <span class="card-stat">
         <span class="stat-label">耗时</span>

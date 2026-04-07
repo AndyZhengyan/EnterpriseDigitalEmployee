@@ -48,7 +48,7 @@ function emitSearch() {
         <label class="filter-label">角色</label>
         <select class="filter-select" v-model="filters.role" @change="emitSearch">
           <option value="all">全部</option>
-          <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
+          <option v-for="r in (roles || [])" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
 
@@ -57,7 +57,7 @@ function emitSearch() {
         <label class="filter-label">部门</label>
         <select class="filter-select" v-model="filters.dept" @change="emitSearch">
           <option value="all">全部</option>
-          <option v-for="d in depts" :key="d" :value="d">{{ d }}</option>
+          <option v-for="d in (depts || [])" :key="d" :value="d">{{ d }}</option>
         </select>
       </div>
     </div>

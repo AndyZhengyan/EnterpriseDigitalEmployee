@@ -12,6 +12,7 @@ const {
   selected,
   total,
   loading,
+  error,
   filters,
   roles,
   depts,
@@ -58,6 +59,11 @@ function handleSearch() {
         <!-- 空状态 -->
         <div v-else-if="executions.length === 0" class="list-empty">
           <p>暂无记录</p>
+        </div>
+
+        <!-- 错误状态 -->
+        <div v-else-if="error" class="list-empty">
+          <p>加载失败</p>
         </div>
 
         <!-- 卡片列表 -->
@@ -164,6 +170,13 @@ function handleSearch() {
   border-top-color: var(--accent-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.list-empty {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-disabled);
+  font-size: 14px;
 }
 
 @keyframes spin {
