@@ -38,7 +38,7 @@ test.describe('Journal E2E', () => {
     await journal.goto();
 
     // 等待卡片加载（mock 模式，6 条记录）
-    await p.waitForTimeout(200);
+    await expect(p.locator('.exec-card').first()).toBeVisible({ timeout: 5000 });
     const count = await p.locator('.exec-card').count();
     expect(count).toBeGreaterThan(0);
 
@@ -63,20 +63,20 @@ test.describe('Journal E2E', () => {
     await expect(p.locator('.detail-grid')).toBeVisible();
 
     // 状态徽章
-    await expect(p.locator('.status-badge')).toBeVisible();
+    await expect(p.locator('.detail-header .status-badge')).toBeVisible();
   });
 
   test('Journal search filters results', async ({ page: p }) => {
     const journal = new JournalPage(p);
     await journal.goto();
 
-    await p.waitForTimeout(200);
+    await expect(p.locator('.exec-card').first()).toBeVisible({ timeout: 5000 });
     const initialCount = await p.locator('.exec-card').count();
     expect(initialCount).toBeGreaterThan(0);
 
     // 搜索关键词：只匹配 "码哥" 相关的记录（exec-001, exec-005）
     await journal.searchByKeyword('码哥');
-    await p.waitForTimeout(200);
+    await expect(p.locator('.exec-card').first()).toBeVisible({ timeout: 5000 });
 
     const filteredCount = await p.locator('.exec-card').count();
     expect(filteredCount).toBeLessThan(initialCount);
@@ -89,17 +89,26 @@ test.describe('Journal E2E', () => {
     }
   });
 
+  test('Journal search with no results shows empty state', async ({ page: p }) => {
+    const journal = new JournalPage(p);
+    await journal.goto();
+    await expect(p.locator('.exec-card').first()).toBeVisible({ timeout: 5000 });
+    await p.fill('.filter-input', 'xyz_no_match_keyword_12345');
+    await p.getByRole('button', { name: '搜索' }).click();
+    await expect(p.locator('.list-empty')).toBeVisible({ timeout: 5000 });
+  });
+
   test('Journal status filter works', async ({ page: p }) => {
     const journal = new JournalPage(p);
     await journal.goto();
 
-    await p.waitForTimeout(200);
+    await expect(p.locator('.exec-card').first()).toBeVisible({ timeout: 5000 });
     const initialCount = await p.locator('.exec-card').count();
     expect(initialCount).toBeGreaterThan(0);
 
     // 筛选"成功"状态
     await journal.selectStatus('ok');
-    await p.waitForTimeout(200);
+    await expect(p.locator('.exec-card').first()).toBeVisible({ timeout: 5000 });
 
     const okCount = await p.locator('.exec-card').count();
     expect(okCount).toBeLessThanOrEqual(initialCount);

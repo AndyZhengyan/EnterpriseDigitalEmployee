@@ -33,11 +33,4 @@ export class JournalPage {
     await this.page.locator('.filter-select').first().selectOption(statusValue);
   }
 
-  async selectRole(roleValue: string) {
-    await this.page.locator('.filter-select').nth(1).selectOption(roleValue);
-  }
-
-  async selectDept(deptValue: string) {
-    await this.page.locator('.filter-select').nth(2).selectOption(deptValue);
-  }
 }
