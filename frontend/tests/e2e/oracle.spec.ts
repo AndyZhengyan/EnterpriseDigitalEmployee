@@ -33,6 +33,9 @@ test.describe('Oracle E2E', () => {
     await expect(p.locator('.archive-card').first()).toBeVisible({ timeout: 5000 });
     const avatarCount = await p.locator('.archive-card').count();
     expect(avatarCount).toBeLessThan(initialCount);
+    for (let i = 0; i < avatarCount; i++) {
+      await expect(p.locator('.archive-card').nth(i).locator('.source-tag')).toContainText('Avatar 记忆');
+    }
 
     // 筛选 导入档案（3 条）
     await oracle.filterBySource('导入档案');
@@ -40,6 +43,9 @@ test.describe('Oracle E2E', () => {
     await expect(p.locator('.archive-card').first()).toBeVisible({ timeout: 5000 });
     const importCount = await p.locator('.archive-card').count();
     expect(importCount).toBeLessThan(initialCount);
+    for (let i = 0; i < importCount; i++) {
+      await expect(p.locator('.archive-card').nth(i).locator('.source-tag')).toContainText('导入档案');
+    }
 
     // 切回全部
     await oracle.filterBySource('全部');
@@ -121,6 +127,9 @@ test.describe('Oracle E2E', () => {
     await expect(p.locator('.list-empty')).not.toBeVisible();
     const avatarCount = await p.locator('.archive-card').count();
     expect(avatarCount).toBe(3);
+    for (let i = 0; i < avatarCount; i++) {
+      await expect(p.locator('.archive-card').nth(i).locator('.source-tag')).toContainText('Avatar 记忆');
+    }
 
     // 切换到导入档案（3条），确认卡片存在且无空状态
     await oracle.filterBySource('导入档案');
@@ -128,6 +137,9 @@ test.describe('Oracle E2E', () => {
     await expect(p.locator('.list-empty')).not.toBeVisible();
     const importCount = await p.locator('.archive-card').count();
     expect(importCount).toBe(3);
+    for (let i = 0; i < importCount; i++) {
+      await expect(p.locator('.archive-card').nth(i).locator('.source-tag')).toContainText('导入档案');
+    }
 
     // 切回全部，确认恢复全部卡片，无空状态
     await oracle.filterBySource('全部');
