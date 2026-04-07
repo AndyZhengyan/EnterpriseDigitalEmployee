@@ -818,18 +818,19 @@ def upload_archive(req: dict, _: bool = Depends(verify_api_key)):
         raise HTTPException(status_code=400, detail="title is required")
     if source not in ("avatar", "import"):
         raise HTTPException(status_code=400, detail="source must be 'avatar' or 'import'")
-    safe_slug = re.sub(r"[^\w\s-]", "", title).replace(" ", "-")
+    safe_slug = re.sub(r"[^\w\s-]", "", title).replace(" ", "-").replace("\n", "-")
     created_at = datetime.date.today().isoformat()
     fp = ORACLE_DIR / source / f"{safe_slug}.md"
     fp.parent.mkdir(parents=True, exist_ok=True)
-    fm = (
-        f"---\n"
-        f"title: {title}\n"
-        f"source: {source}\n"
-        f"contributor: {contributor}\n"
-        f"created_at: {created_at}\n"
-        f"tags: []\n"
-        f"---\n\n"
-    )
-    fp.write_text(fm + body_content, encoding="utf-8")
+    if fp.exists():
+        raise HTTPException(status_code=409, detail="Archive with this title already exists")
+    fm_dict = {
+        "title": title,
+        "source": source,
+        "contributor": contributor,
+        "created_at": created_at,
+        "tags": [],
+    }
+    fm = yaml.safe_dump(fm_dict, allow_unicode=True, default_flow_style=False)
+    fp.write_text(f"---\n{fm}---\n\n" + "\n" + body_content, encoding="utf-8")
     return {"id": safe_slug, "path": str(fp.relative_to(ORACLE_DIR)), "message": "上传成功"}

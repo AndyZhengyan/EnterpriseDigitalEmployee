@@ -2,6 +2,7 @@
 
 import os
 import sys
+from urllib.parse import quote
 
 import pytest
 
@@ -108,7 +109,7 @@ class TestListArchives:
         assert data["items"][0]["source"] == "import"
 
     def test_list_archives_response_fields(self, client, seeded_archives):
-        resp = client.get("/api/oracle/archives?source=avatar&limit=1")
+        resp = client.get("/api/oracle/archives?source=avatar")
         assert resp.status_code == 200
         item = resp.json()["items"][0]
         assert "id" in item
@@ -192,6 +193,38 @@ class TestUploadArchive:
         )
         assert resp.status_code == 400
         assert resp.json()["detail"] == "source must be 'avatar' or 'import'"
+
+    def test_upload_yaml_injection_blocked(self, client, seeded_archives):
+        """Title containing YAML injection payload should be safely stored as title value."""
+        resp = client.post(
+            "/api/oracle/archives/upload",
+            json={
+                "title": "Test\n---\ninjected: evil",
+                "source": "import",
+                "content": "normal body",
+                "contributor": "admin",
+            },
+        )
+        assert resp.status_code == 200
+        archive_id = resp.json()["id"]
+        detail = client.get(f"/api/oracle/archives/{quote(archive_id, safe='')}")
+        assert detail.status_code == 200
+        # The title should be stored as-is, not parsed as having injected YAML keys
+        assert detail.json()["meta"]["title"] == "Test\n---\ninjected: evil"
+
+    def test_upload_archive_conflict(self, client, seeded_archives):
+        """Uploading an archive with the same title should return 409."""
+        resp = client.post(
+            "/api/oracle/archives/upload",
+            json={
+                "title": "合同风险识别",
+                "source": "avatar",
+                "content": "duplicate body",
+                "contributor": "admin",
+            },
+        )
+        assert resp.status_code == 409
+        assert "already exists" in resp.json()["detail"]
 
     def test_upload_archive_default_source(self, client, seeded_archives, oracle_dir):
         resp = client.post(
