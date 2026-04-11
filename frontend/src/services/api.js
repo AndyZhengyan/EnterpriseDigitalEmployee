@@ -14,7 +14,7 @@ import {
   DEPARTMENTS,
 } from '../mock/blueprints.js';
 
-const USE_MOCK = true; // flip to false when connecting to real backend
+const USE_MOCK = false; // flip to false when connecting to real backend
 
 const api = axios.create({
   baseURL: '/api',
@@ -147,13 +147,11 @@ export const onboardingApi = {
     USE_MOCK
       ? mockAdjustTraffic(blueprintId, versionIndex, traffic)
       : api.put(`/onboarding/blueprints/${blueprintId}/traffic`, {
-          versionIndex,
+          version_index: versionIndex,
           traffic,
         }),
   deprecateVersion: (blueprintId, versionIndex) =>
-    api.put(`/onboarding/blueprints/${blueprintId}/deprecate`, {
-      versionIndex,
-    }),
+    api.put(`/onboarding/blueprints/${blueprintId}/versions/${versionIndex}/deprecate`),
 };
 
 // ---- Mock Journal Data ----

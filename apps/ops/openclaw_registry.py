@@ -79,20 +79,59 @@ class OpenclawAgentRegistry:
         department: str,
         soul: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Create or update agent directory for a blueprint."""
+        """Register agent with openclaw CLI and set up its directory."""
+        import subprocess
+
         soul = soul or {}
         agent_dir = self.agents_dir / blueprint_id / "agent"
+        workspace_dir = self.agents_dir / blueprint_id / "workspace"
         agent_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. Write SOUL.md
+        # 1. Register with openclaw CLI (idempotent — skips if already registered)
+        try:
+            result = subprocess.run(
+                [
+                    "openclaw",
+                    "agents",
+                    "add",
+                    blueprint_id,
+                    "--agent-dir",
+                    str(agent_dir),
+                    "--workspace",
+                    str(workspace_dir),
+                    "--non-interactive",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+            if result.returncode == 0:
+                logger.info(
+                    "agent_registered_via_cli",
+                    blueprint_id=blueprint_id,
+                    alias=alias,
+                )
+            else:
+                stderr = result.stderr.strip()
+                if "already exists" not in stderr.lower():
+                    logger.warning(
+                        "agent_register_cli_partial",
+                        blueprint_id=blueprint_id,
+                        stderr=stderr[:200],
+                    )
+        except Exception as e:
+            logger.warning("agent_register_cli_failed", blueprint_id=blueprint_id, error=str(e))
+
+        # 2. Write SOUL.md
         soul_md = generate_soul_md(blueprint_id, alias, role, department, soul)
         (agent_dir / "SOUL.md").write_text(soul_md, encoding="utf-8")
 
-        # 2. Copy auth-profiles.json and models.json from a template agent
+        # 3. Copy auth-profiles.json and models.json from a template agent
         self._copy_agent_configs(agent_dir)
 
         logger.info(
-            "agent_registered",
+            "agent_setup_complete",
             blueprint_id=blueprint_id,
             alias=alias,
             agent_dir=str(agent_dir),
@@ -100,11 +139,40 @@ class OpenclawAgentRegistry:
         return True
 
     def remove_agent(self, blueprint_id: str) -> bool:
-        """Delete agent directory for a blueprint."""
+        """Remove agent from openclaw config and delete its directory.
+
+        Uses direct config manipulation (the canonical openclaw "agents delete" flow)
+        so we avoid CLI hangs from gateway/credential prompts.
+        """
+        import json
+
+        # 1. Remove from openclaw.json agents.list
+        config_path = self.openclaw_dir / "openclaw.json"
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    cfg = json.load(f)
+                agents_list = cfg.get("agents", {}).get("list", [])
+                before = len(agents_list)
+                agents_list = [a for a in agents_list if a.get("id") != blueprint_id]
+                if len(agents_list) < before:
+                    cfg["agents"]["list"] = agents_list
+                    # Write backup then update
+                    bak = config_path.with_suffix(".json.bak")
+                    shutil.copy2(config_path, bak)
+                    with open(config_path, "w") as f:
+                        json.dump(cfg, f, indent=2, ensure_ascii=False)
+                    f.write("\n")  # trailing newline
+                    logger.info("agent_removed_from_config", blueprint_id=blueprint_id)
+            except Exception as e:
+                logger.warning("agent_config_edit_failed", blueprint_id=blueprint_id, error=str(e))
+
+        # 2. Remove agent directory tree
         agent_dir = self.agents_dir / blueprint_id
         if agent_dir.exists():
             shutil.rmtree(agent_dir)
-            logger.info("agent_removed", blueprint_id=blueprint_id)
+            logger.info("agent_dir_removed", blueprint_id=blueprint_id)
+
         return True
 
     def _copy_agent_configs(self, target_dir: Path) -> None:

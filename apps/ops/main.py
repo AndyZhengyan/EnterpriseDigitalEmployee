@@ -690,6 +690,82 @@ def delete_blueprint(bp_id: str, _: bool = Depends(verify_api_key)):
     return {"deleted": bp_id}
 
 
+# ─── Test Support ────────────────────────────────────────────────────────────
+
+
+SEED_VERSIONS = {
+    "av-admin-001": [
+        {"version": "v1.0.0", "status": "published", "traffic": 60, "replicas": 3,
+         "config": {"soul": {"mbti": "ISFJ", "style": "简洁汇报", "priority": "效率优先"},
+                     "skills": ["飞书通知", "文档处理"], "tools": ["飞书API", "文档处理器"],
+                     "model": "claude-sonnet-4-7"},
+         "scaling": {"min_replicas": 1, "max_replicas": 5, "target_load": 60}},
+        {"version": "v1.0.1", "status": "published", "traffic": 40, "replicas": 2,
+         "config": {"soul": {"mbti": "ISFJ", "style": "简洁汇报", "priority": "效率优先"},
+                     "skills": ["飞书通知", "文档处理", "数据录入"],
+                     "tools": ["飞书API", "文档处理器", "数据库连接器"],
+                     "model": "claude-sonnet-4-7"},
+         "scaling": {"min_replicas": 1, "max_replicas": 5, "target_load": 60}},
+        {"version": "v1.1.0-beta", "status": "testing", "traffic": 0, "replicas": 1,
+         "config": {"soul": {"mbti": "INTJ", "style": "详细说明", "priority": "合规优先"},
+                     "skills": ["飞书通知", "文档处理", "数据分析", "合规检查"],
+                     "tools": ["飞书API", "文档处理器", "数据分析引擎"],
+                     "model": "claude-opus-4-7"},
+         "scaling": {"min_replicas": 1, "max_replicas": 3, "target_load": 70}},
+    ],
+    "av-legal-001": [
+        {"version": "v1.0.0", "status": "published", "traffic": 100, "replicas": 1,
+         "config": {"soul": {"mbti": "INTJ", "style": "详细说明", "priority": "合规优先"},
+                     "skills": ["合同审核", "法规检索", "合规检查"],
+                     "tools": ["飞书API", "知识库检索", "合规引擎"],
+                     "model": "claude-opus-4-7"},
+         "scaling": {"min_replicas": 1, "max_replicas": 3, "target_load": 60}},
+    ],
+    "av-contract-001": [
+        {"version": "v1.0.0", "status": "published", "traffic": 100, "replicas": 2,
+         "config": {"soul": {"mbti": "ESTJ", "style": "简洁汇报", "priority": "合规优先"},
+                     "skills": ["合同起草", "版本管理", "文档归档"],
+                     "tools": ["飞书API", "文档处理器", "版本追踪器"],
+                     "model": "claude-sonnet-4-7"},
+         "scaling": {"min_replicas": 1, "max_replicas": 5, "target_load": 65}},
+    ],
+    "av-swe-001": [
+        {"version": "v1.0.0", "status": "published", "traffic": 100, "replicas": 5,
+         "config": {"soul": {"mbti": "INTP", "style": "详细说明", "priority": "效率优先"},
+                     "skills": ["代码开发", "代码审查", "技术写作"],
+                     "tools": ["git CLI", "GitHub MCP", "代码分析器"],
+                     "model": "claude-sonnet-4-7"},
+         "scaling": {"min_replicas": 2, "max_replicas": 10, "target_load": 60}},
+    ],
+}
+
+SEED_CAPACITY = {
+    "av-admin-001": {"used": 6, "max": 10},
+    "av-legal-001": {"used": 1, "max": 5},
+    "av-contract-001": {"used": 2, "max": 5},
+    "av-swe-001": {"used": 5, "max": 10},
+}
+
+
+@app.post("/api/test/reset-seeds")
+def reset_seed_blueprints(_: bool = Depends(verify_api_key)):
+    """Reset all seed blueprints to their original versions and traffic.
+    Used by E2E tests to ensure consistent state before each test."""
+    conn = get_db()
+    cur = conn.cursor()
+    for bp_id, versions in SEED_VERSIONS.items():
+        total_used = sum(v["replicas"] for v in versions if v["traffic"] > 0)
+        capacity = dict(SEED_CAPACITY[bp_id])
+        capacity["used"] = total_used
+        cur.execute(
+            "UPDATE blueprints SET versions = ?, capacity = ? WHERE id = ?",
+            (json.dumps(versions), json.dumps(capacity), bp_id),
+        )
+    conn.commit()
+    conn.close()
+    return {"reset": "ok", "seeds": list(SEED_VERSIONS.keys())}
+
+
 # ── Journal — Audit Log ────────────────────────────────────────
 
 

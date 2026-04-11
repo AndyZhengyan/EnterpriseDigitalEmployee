@@ -63,7 +63,7 @@ function startAdjustTraffic(v, idx) {
 
 async function confirmTrafficAdjustment(v, idx) {
   if (props.blueprint.id.startsWith('av-')) {
-    await adjustTraffic(props.blueprint.id, idx, _adjustingTraffic.value);
+    await adjustTraffic(props.blueprint.id, idx, _adjustingTraffic.value).catch(() => {});
   }
   v.traffic = _adjustingTraffic.value;
   adjustingIdx.value = null;
@@ -120,7 +120,9 @@ async function executeTask() {
     });
     taskResult.value = res.data;
   } catch (e) {
-    taskError.value = e.message || '执行失败';
+    // Show error message for both API errors and network failures
+    const msg = e?.response?.data?.detail || e?.message || '网络请求失败，请检查服务状态';
+    taskError.value = msg;
   } finally {
     taskRunning.value = false;
   }
@@ -354,9 +356,11 @@ function closeTaskPanel() {
 
 .version-row {
   display: flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  overflow: hidden;
 }
 
 .version-row--offline {
