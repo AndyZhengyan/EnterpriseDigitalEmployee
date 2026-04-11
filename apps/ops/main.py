@@ -875,21 +875,21 @@ def list_executions(
     if end_date:
         where_clauses.append("created_at <= ?")
         params.append(end_date)
-    if roles:
+    if roles and roles != "all":
         role_list = [r.strip() for r in roles.split(",") if r.strip()]
         placeholders = ",".join("?" * len(role_list))
         where_clauses.append(f"role IN ({placeholders})")
         params.extend(role_list)
-    if depts:
+    if depts and depts != "all":
         dept_list = [d.strip() for d in depts.split(",") if d.strip()]
         placeholders = ",".join("?" * len(dept_list))
         where_clauses.append(f"dept IN ({placeholders})")
         params.extend(dept_list)
-    if status:
+    if status and status != "all":
         where_clauses.append("status = ?")
         params.append(status)
     if q:
-        where_clauses.append("(message LIKE ? OR summary LIKE ?)")
+        where_clauses.append("(message LIKE ? OR summary LIKE ? OR response_text LIKE ?)")
         params.extend([f"%{q}%", f"%{q}%"])
     where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
     cur.execute(f"SELECT COUNT(*) FROM task_executions WHERE {where_sql}", params)
