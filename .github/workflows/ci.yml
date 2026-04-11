@@ -89,7 +89,7 @@ jobs:
           OPS_DB_PATH: data/ops.test.db
           PIAGENT_CLI_STUB: "true"
         run: |
-          .venv/bin/uvicorn apps.ops.main:app --port 8002 &
+          .venv/bin/uvicorn apps.ops.main:app --port 8006 &
           sleep 3
 
       - name: Run E2E tests
