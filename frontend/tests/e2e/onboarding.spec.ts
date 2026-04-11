@@ -1,22 +1,23 @@
 /**
  * onboarding.spec.ts — e-Agent-OS Onboarding E2E (real backend)
- * Tests run against the live Ops API (:8006) with Vite dev server (:5173).
+ * Tests run against the live Ops API via Vite proxy (localhost:5173 → :8006).
  */
 
 import { test, expect } from '@playwright/test';
 import { OnboardingPage } from './page-objects/onboarding.page';
 
 const SEED_BP_IDS = ['av-admin-001', 'av-legal-001', 'av-contract-001', 'av-swe-001'];
-const BACKEND = 'http://localhost:8006';
+// Use vite proxy (5173) so CI waits for dev server health check before testing
+const BASE = 'http://localhost:5173';
 
 test.beforeEach(async ({ request, page }) => {
   // Reset seeds and clean up non-seed blueprints
-  await request.post(`${BACKEND}/api/test/reset-seeds`);
-  const resp = await request.get(`${BACKEND}/api/onboarding/blueprints`);
+  await request.post(`${BASE}/api/test/reset-seeds`);
+  const resp = await request.get(`${BASE}/api/onboarding/blueprints`);
   const blueprints = (await resp.json()) as Array<{ id: string }>;
   for (const bp of blueprints) {
     if (!SEED_BP_IDS.includes(bp.id)) {
-      await request.delete(`${BACKEND}/api/onboarding/blueprints/${bp.id}`);
+      await request.delete(`${BASE}/api/onboarding/blueprints/${bp.id}`);
     }
   }
   // Reload so Vue re-fetches fresh state

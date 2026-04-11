@@ -90,7 +90,7 @@ jobs:
           PIAGENT_CLI_STUB: "true"
         run: |
           .venv/bin/uvicorn apps.ops.main:app --port 8006 &
-          sleep 3
+          sleep 10
 
       - name: Run E2E tests
         # Playwright's webServer config (in playwright.config.ts) starts the dev server
