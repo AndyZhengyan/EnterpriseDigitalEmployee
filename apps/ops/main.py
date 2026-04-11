@@ -181,6 +181,16 @@ def _get_gateway_token() -> str:
         return ""
 
 
+def _normalize_openclaw_id(agent_id: str) -> str:
+    """Strip non-ASCII chars so openclaw can find the normalized agent ID.
+
+    openclaw normalizes agent IDs (removes Chinese/non-ASCII chars) when they are
+    registered via `openclaw agents add`. For example, 'av-行政专员-123'
+    becomes 'av---123'. We must use the normalized form when calling openclaw.
+    """
+    return agent_id.encode("ascii", "ignore").decode("ascii")
+
+
 def _run_piagent(message: str, agent_id: str = "chat", timeout: int = 60) -> Dict[str, Any]:
     """Call openclaw CLI (pi-agent) and return parsed JSON result. Stub for CI."""
     import uuid
@@ -200,7 +210,8 @@ def _run_piagent(message: str, agent_id: str = "chat", timeout: int = 60) -> Dic
                 }
             },
         }
-    # ... 其余逻辑不变 ...
+
+    normalized_id = _normalize_openclaw_id(agent_id)
     token = _get_gateway_token()
     gateway_url = os.environ.get("OPENCLAW_GATEWAY_URL", "http://127.0.0.1:18789")
     env = {
@@ -214,7 +225,7 @@ def _run_piagent(message: str, agent_id: str = "chat", timeout: int = 60) -> Dic
                 "openclaw",
                 "agent",
                 "--agent",
-                agent_id,
+                normalized_id,
                 "--message",
                 message,
                 "--json",
@@ -229,12 +240,24 @@ def _run_piagent(message: str, agent_id: str = "chat", timeout: int = 60) -> Dic
             env=env,
             check=False,
         )
-        if result.returncode != 0:
-            return {"status": "error", "summary": f"CLI error: {result.stderr[:200]}", "usage": {}}
-        stdout = result.stdout.strip()
-        if not stdout:
+        # openclaw writes JSON response to stderr (stdout is typically empty)
+        stderr_output = result.stderr.strip()
+        if not stderr_output:
             return {"status": "error", "summary": "Empty response", "usage": {}}
-        return json.loads(stdout)
+        # Find JSON start (stderr may have config warnings before the JSON object)
+        json_start = stderr_output.find("{")
+        if json_start == -1:
+            # No JSON found — return error unless exit code is 0
+            if result.returncode == 0:
+                return {"status": "error", "summary": f"No JSON in output: {stderr_output[:200]}", "usage": {}}
+            return {"status": "error", "summary": f"CLI error: {stderr_output[:200]}", "usage": {}}
+        parsed = json.loads(stderr_output[json_start:])
+        # Extract the actual response text for the user
+        text = parsed.get("payloads", [{}])[0].get("text", "") or parsed.get("meta", {}).get(
+            "finalAssistantVisibleText", ""
+        )
+        parsed["responseText"] = text
+        return parsed
     except FileNotFoundError:
         return {"status": "error", "summary": "openclaw CLI not found in PATH", "usage": {}}
     except subprocess.TimeoutExpired:
@@ -471,7 +494,16 @@ def execute_task(req: dict, _: bool = Depends(verify_api_key)):
     role = req.get("role", "软件工程师")
     dept = req.get("dept", "技术研发部")
 
-    raw = _run_piagent(message, agent_id, timeout=120)
+    # Look up the openclaw-normalized agent ID from DB
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT openclaw_agent_id FROM blueprints WHERE id = ?", (bp_id,))
+    row = cur.fetchone()
+    conn.close()
+    # Use normalized ID if set, otherwise fall back to original (pre-migration blueprints)
+    openclaw_agent_id = row[0] if row and row[0] else agent_id
+
+    raw = _run_piagent(message, openclaw_agent_id, timeout=120)
 
     # Usage is at raw["result"]["meta"]["agentMeta"]["usage"]
     meta = raw.get("result", {}).get("meta", {})
@@ -507,6 +539,7 @@ def execute_task(req: dict, _: bool = Depends(verify_api_key)):
         "runId": run_id,
         "status": status,
         "summary": summary,
+        "responseText": raw.get("responseText", ""),
         "tokenInput": token_input,
         "tokenAnalysis": token_analysis,
         "tokenCompletion": token_completion,
@@ -558,12 +591,12 @@ def deploy_avatar(req: dict, _: bool = Depends(verify_api_key)):
         "scaling": scaling,
     }
 
-    # Create openclaw agent
+    # Create openclaw agent and get the normalized ID openclaw uses internally
     openclaw_dir = Path(os.environ.get("OPENCLAW_DIR", str(os.path.expanduser("~/.openclaw"))))
     agents_dir = openclaw_dir / "agents"
     registry = OpenclawAgentRegistry(openclaw_dir=openclaw_dir, agents_dir=agents_dir)
     try:
-        registry.register_agent(
+        _, openclaw_agent_id = registry.register_agent(
             blueprint_id=bp_id,
             alias=req["alias"],
             role=req["role"],
@@ -576,7 +609,9 @@ def deploy_avatar(req: dict, _: bool = Depends(verify_api_key)):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO blueprints (id, role, alias, department, versions, capacity) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO blueprints "
+        "(id, role, alias, department, versions, capacity, openclaw_agent_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             bp_id,
             req["role"],
@@ -584,6 +619,7 @@ def deploy_avatar(req: dict, _: bool = Depends(verify_api_key)):
             req["department"],
             json.dumps([new_version]),
             json.dumps({"used": scaling["minReplicas"], "max": scaling["maxReplicas"]}),
+            openclaw_agent_id,
         ),
     )
     conn.commit()

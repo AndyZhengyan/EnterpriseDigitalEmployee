@@ -78,8 +78,13 @@ class OpenclawAgentRegistry:
         role: str,
         department: str,
         soul: Optional[Dict[str, Any]] = None,
-    ) -> bool:
-        """Register agent with openclaw CLI and set up its directory."""
+    ) -> tuple[bool, str]:
+        """Register agent with openclaw CLI and set up its directory.
+
+        Returns (success, openclaw_agent_id) where openclaw_agent_id is the
+        normalized ID that openclaw uses (e.g. 'av---123' for 'av-行政专员-123').
+        """
+        import re
         import subprocess
 
         soul = soul or {}
@@ -88,6 +93,7 @@ class OpenclawAgentRegistry:
         agent_dir.mkdir(parents=True, exist_ok=True)
 
         # 1. Register with openclaw CLI (idempotent — skips if already registered)
+        normalized_id = blueprint_id  # fallback to original if CLI call fails
         try:
             result = subprocess.run(
                 [
@@ -107,9 +113,17 @@ class OpenclawAgentRegistry:
                 check=False,
             )
             if result.returncode == 0:
+                # Parse the normalized agent ID from openclaw output
+                # e.g. "Normalized agent id to \"av---1775915029\""
+                for line in (result.stdout + result.stderr).splitlines():
+                    m = re.search(r'Normalized agent id to "?([^"]+)"?', line)
+                    if m:
+                        normalized_id = m.group(1)
+                        break
                 logger.info(
                     "agent_registered_via_cli",
                     blueprint_id=blueprint_id,
+                    openclaw_agent_id=normalized_id,
                     alias=alias,
                 )
             else:
@@ -133,10 +147,11 @@ class OpenclawAgentRegistry:
         logger.info(
             "agent_setup_complete",
             blueprint_id=blueprint_id,
+            openclaw_agent_id=normalized_id,
             alias=alias,
             agent_dir=str(agent_dir),
         )
-        return True
+        return True, normalized_id
 
     def remove_agent(self, blueprint_id: str) -> bool:
         """Remove agent from openclaw config and delete its directory.

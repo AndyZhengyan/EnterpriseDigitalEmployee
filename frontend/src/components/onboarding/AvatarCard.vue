@@ -271,7 +271,10 @@ function closeTaskPanel() {
             <span class="dot" :style="{ background: taskResult.status === 'ok' ? 'var(--success)' : 'var(--danger)' }"></span>
             {{ taskResult.status === 'ok' ? '执行完成' : '执行失败' }}
           </div>
-          <p class="result-summary">{{ taskResult.summary }}</p>
+          <div v-if="taskResult.responseText" class="result-text">
+            {{ taskResult.responseText }}
+          </div>
+          <p v-else class="result-summary">{{ taskResult.summary }}</p>
           <div class="result-meta">
             <span>{{ taskResult.tokenTotal?.toLocaleString() }} tokens</span>
             <span>{{ (taskResult.durationMs / 1000).toFixed(1) }}s</span>
@@ -620,6 +623,19 @@ function closeTaskPanel() {
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
+}
+
+.result-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  line-height: 1.6;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
 }
 
 .result-meta {

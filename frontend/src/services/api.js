@@ -18,7 +18,7 @@ const USE_MOCK = false; // flip to false when connecting to real backend
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 5000,
+  timeout: 300_000,  // 5 minutes — agent tasks can take time
 });
 
 // ---- Mock Implementations ----

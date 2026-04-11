@@ -121,6 +121,10 @@ def init_db():
         is_active INTEGER NOT NULL DEFAULT 1
     );
     """)
+    try:
+        conn.execute("ALTER TABLE blueprints ADD COLUMN openclaw_agent_id TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
     conn.commit()
     conn.close()
     seed_data()
