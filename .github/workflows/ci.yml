@@ -79,7 +79,9 @@ jobs:
         run: cd frontend && npm install
 
       - name: Install backend deps
-        run: pip install -e ".[dev]"
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
 
       - name: Install Playwright browsers
         run: cd frontend && npx playwright install --with-deps chromium
