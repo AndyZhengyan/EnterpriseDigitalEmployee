@@ -693,7 +693,7 @@ def delete_blueprint(bp_id: str, _: bool = Depends(verify_api_key)):
 # ─── Test Support ────────────────────────────────────────────────────────────
 
 
-SEED_VERSIONS = {
+SEED_VERSIONS: dict[str, list[dict[str, Any]]] = {
     "av-admin-001": [
         {
             "version": "v1.0.0",
