@@ -22,10 +22,13 @@ from .db import (
     get_recent_executions,
     init_db,
     record_execution,
+    get_blueprint_config,
+    save_blueprint_config,
 )
 from .key_manager import OPSKeyManager
 from .openclaw_registry import OpenclawAgentRegistry
 from .tools_registry import list_tools, create_tool, update_tool, delete_tool
+from .avatar_assembler import write_avatar_files, get_assembled_config
 
 _key_manager: Optional[OPSKeyManager] = None
 
@@ -681,6 +684,35 @@ def del_tools(tool_id: str):
     if not delete_tool(tool_id):
         raise HTTPException(status_code=404, detail="Tool not found")
     return {"message": "deleted"}
+
+
+# ── Avatar Config API ────────────────────────────────────────────────────────
+
+
+@app.get("/onboarding/blueprints/{bp_id}/config")
+def get_avatar_config(bp_id: str, _: bool = Depends(verify_api_key)):
+    """Get full avatar config for a blueprint, merging DB fields + assembled files."""
+    db_config = get_blueprint_config(bp_id)
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Blueprint not found")
+    # Merge with live file content
+    agent_id = db_config.get("openclaw_agent_id") or bp_id
+    file_content = get_assembled_config(agent_id)
+    return {**db_config, **file_content}
+
+
+@app.put("/onboarding/blueprints/{bp_id}/config")
+def put_avatar_config(bp_id: str, config: dict, _: bool = Depends(verify_api_key)):
+    """Save avatar config to DB and write OpenClaw .md files."""
+    db_config = get_blueprint_config(bp_id)
+    if not db_config:
+        raise HTTPException(status_code=404, detail="Blueprint not found")
+    # Save structured fields to DB
+    save_blueprint_config(bp_id, config)
+    # Assemble and write to OpenClaw files
+    full_config = {**db_config, **config}
+    write_avatar_files(full_config)
+    return {"message": "saved", "blueprint_id": bp_id}
 
 
 # ─── Test Support ────────────────────────────────────────────────────────────

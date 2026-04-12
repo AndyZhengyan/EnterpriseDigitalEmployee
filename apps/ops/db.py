@@ -132,6 +132,29 @@ def init_db():
         conn.execute("ALTER TABLE blueprints ADD COLUMN openclaw_agent_id TEXT")
     except sqlite3.OperationalError:
         pass  # column already exists
+
+    # Add avatar config columns
+    try:
+        conn.execute("ALTER TABLE blueprints ADD COLUMN soul_content TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    try:
+        conn.execute("ALTER TABLE blueprints ADD COLUMN agents_content TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    try:
+        conn.execute("ALTER TABLE blueprints ADD COLUMN user_content TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    try:
+        conn.execute("ALTER TABLE blueprints ADD COLUMN tools_enabled TEXT DEFAULT '[]'")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+    try:
+        conn.execute("ALTER TABLE blueprints ADD COLUMN selected_model TEXT DEFAULT ''")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
     conn.commit()
     conn.close()
 
@@ -457,6 +480,52 @@ def seed_tools():
             "INSERT OR IGNORE INTO tools (id, name, description, created_at) VALUES (?, ?, ?, ?)",
             (name, name, description, datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
         )
+    conn.commit()
+    conn.close()
+
+
+def get_blueprint_config(bp_id: str):
+    """Return full avatar config for a blueprint."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT id, role, alias, department, openclaw_agent_id,
+                  soul_content, agents_content, user_content,
+                  tools_enabled, selected_model
+           FROM blueprints WHERE id = ?""",
+        (bp_id,),
+    )
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    import json
+    return {
+        "id": row[0], "role": row[1], "alias": row[2], "department": row[3],
+        "openclaw_agent_id": row[4] or row[0],
+        "soul_content": row[5] or "", "agents_content": row[6] or "",
+        "user_content": row[7] or "", "tools_enabled": json.loads(row[8] or "[]"),
+        "selected_model": row[9] or "",
+    }
+
+def save_blueprint_config(bp_id: str, config: dict):
+    """Save avatar config fields for a blueprint."""
+    import json
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        UPDATE blueprints SET
+          soul_content = ?, agents_content = ?, user_content = ?,
+          tools_enabled = ?, selected_model = ?
+        WHERE id = ?
+    """, (
+        config.get("soul_content", ""),
+        config.get("agents_content", ""),
+        config.get("user_content", ""),
+        json.dumps(config.get("tools_enabled", [])),
+        config.get("selected_model", ""),
+        bp_id,
+    ))
     conn.commit()
     conn.close()
 
