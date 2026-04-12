@@ -290,27 +290,23 @@ def _demo_scheduler():
             summary = raw.get("summary", "")
             duration_ms = meta.get("durationMs", 0)
 
-            if run_id:
-                exec_id = record_execution(
-                    run_id=run_id,
-                    blueprint_id=bp_id,
-                    alias=alias,
-                    role=role,
-                    dept=dept,
-                    message=message,
-                    status=status,
-                    token_input=token_input,
-                    token_analysis=usage.get("cacheRead", 0),
-                    token_completion=token_completion,
-                    duration_ms=duration_ms,
-                    summary=summary[:200] if summary else "",
-                    response_text=raw.get("responseText", ""),
-                )
-                tok = token_input + token_completion
-                log.info("demo_task_completed", idx=idx, alias=alias, tokens=tok, exec_id=exec_id, run_id=run_id[:8])
-            else:
-                summary_preview = raw.get("summary", "unknown")[:40]
-                log.warning("demo_task_no_run_id", idx=idx, summary=summary_preview)
+            exec_id = record_execution(
+                run_id=run_id or "",
+                blueprint_id=bp_id,
+                alias=alias,
+                role=role,
+                dept=dept,
+                message=message,
+                status=status,
+                token_input=token_input,
+                token_analysis=usage.get("cacheRead", 0),
+                token_completion=token_completion,
+                duration_ms=duration_ms,
+                summary=summary[:200] if summary else "",
+                response_text=raw.get("responseText", ""),
+            )
+            tok = token_input + token_completion
+            log.info("demo_task_recorded", idx=idx, alias=alias, tokens=tok, exec_id=exec_id, status=status)
         except Exception as e:
             log.error("demo_task_error", idx=idx, error=str(e))
 
@@ -413,6 +409,22 @@ def get_task_detail():
     }
 
 
+@app.get("/api/dashboard/task-trend")
+def get_task_trend(_: bool = Depends(verify_api_key)):
+    """Returns task trend as [{date, value}] for the TaskTrend chart component."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT dates, success, failed FROM task_detail LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return []
+    dates = json.loads(row[0])
+    success = json.loads(row[1])
+    # Return success counts as trend data
+    return [{"date": d, "value": s} for d, s in zip(dates, success)]
+
+
 @app.get("/api/dashboard/token-daily")
 def get_token_daily():
     return get_token_trend()
@@ -440,7 +452,7 @@ def get_activity(limit: int = 10):
                 "id": ex["id"],
                 "type": "task_completed" if ex["status"] == "ok" else "task_failed",
                 "employeeId": ex["blueprint_id"],
-                "alias": ex["alias"],
+                "employeeName": ex["alias"],
                 "role": ex["role"],
                 "dept": ex["dept"],
                 "content": ex["summary"] or ex["message"][:60],
@@ -462,7 +474,7 @@ def get_activity(limit: int = 10):
                     "id": r[0],
                     "type": r[1],
                     "employeeId": r[2],
-                    "alias": r[3],
+                    "employeeName": r[3],
                     "role": r[4],
                     "dept": r[5],
                     "content": r[6],
@@ -518,24 +530,21 @@ def execute_task(req: dict, _: bool = Depends(verify_api_key)):
     summary = response_text[:200] if response_text else raw.get("summary", "")
     duration_ms = meta.get("durationMs", 0)
 
-    if run_id:
-        exec_id = record_execution(
-            run_id=run_id,
-            blueprint_id=bp_id,
-            alias=alias,
-            role=role,
-            dept=dept,
-            message=message,
-            status=status,
-            token_input=token_input,
-            token_analysis=token_analysis,
-            token_completion=token_completion,
-            duration_ms=duration_ms,
-            summary=summary[:200] if summary else "",
-            response_text=response_text,
-        )
-    else:
-        exec_id = None
+    exec_id = record_execution(
+        run_id=run_id or "",
+        blueprint_id=bp_id,
+        alias=alias,
+        role=role,
+        dept=dept,
+        message=message,
+        status=status,
+        token_input=token_input,
+        token_analysis=token_analysis,
+        token_completion=token_completion,
+        duration_ms=duration_ms,
+        summary=summary[:200] if summary else "",
+        response_text=response_text,
+    )
 
     return {
         "execId": exec_id,
@@ -995,8 +1004,13 @@ def _scan_archives(source_filter: str | None = None) -> list[dict]:
             continue
         for f in d.glob("*.md"):
             content = f.read_text(encoding="utf-8")
-            meta, _ = _read_frontmatter(content)
+            meta, body = _read_frontmatter(content)
             slug = f.stem
+            # Extract summary: first non-empty line of body, stripped, max 100 chars
+            summary = ""
+            if body:
+                first_line = next((line.strip() for line in body.splitlines() if line.strip()), "")
+                summary = first_line[:100]
             archives.append(
                 {
                     "id": slug,
@@ -1005,7 +1019,7 @@ def _scan_archives(source_filter: str | None = None) -> list[dict]:
                     "contributor": meta.get("contributor", ""),
                     "createdAt": meta.get("created_at", ""),
                     "tags": meta.get("tags", []),
-                    "path": str(f.relative_to(ORACLE_DIR)),
+                    "summary": summary,
                 }
             )
     return sorted(archives, key=lambda a: a.get("createdAt", ""), reverse=True)
@@ -1028,14 +1042,12 @@ def get_archive(archive_id: str, _: bool = Depends(verify_api_key)):
             content = fp.read_text(encoding="utf-8")
             meta, body = _read_frontmatter(content)
             return {
-                "meta": {
-                    "id": archive_id,
-                    "title": meta.get("title", archive_id),
-                    "source": sd,
-                    "contributor": meta.get("contributor", ""),
-                    "createdAt": meta.get("created_at", ""),
-                    "tags": meta.get("tags", []),
-                },
+                "id": archive_id,
+                "title": meta.get("title", archive_id),
+                "source": sd,
+                "contributor": meta.get("contributor", ""),
+                "createdAt": meta.get("created_at", ""),
+                "tags": meta.get("tags", []),
                 "content": body.strip(),
             }
     raise HTTPException(status_code=404, detail="Archive not found")
