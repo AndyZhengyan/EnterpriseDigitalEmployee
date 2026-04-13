@@ -104,7 +104,9 @@ def assemble_tools(config: dict) -> str:
 
 def write_avatar_files(config: dict):
     """Write all OpenClaw .md files for an avatar."""
-    agent_id = config.get("openclaw_agent_id") or config.get("id")
+    # Use blueprint id (id) as primary path key — deploy creates dirs at this path.
+    # openclaw_agent_id may differ (e.g. av---... vs av-中文-...) so prefer id.
+    agent_id = config.get("id") or config.get("openclaw_agent_id")
     agent_dir = _ensure_agent_dir(agent_id)
 
     files = {

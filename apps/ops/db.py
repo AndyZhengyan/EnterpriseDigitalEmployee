@@ -509,24 +509,38 @@ def get_blueprint_config(bp_id: str):
     }
 
 def save_blueprint_config(bp_id: str, config: dict):
-    """Save avatar config fields for a blueprint."""
+    """Save avatar config fields for a blueprint.
+
+    Only updates fields that are not None in the config dict.
+    This allows partial updates (only changed fields) without overwriting others.
+    """
     import json
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""
-        UPDATE blueprints SET
-          soul_content = ?, agents_content = ?, user_content = ?,
-          tools_enabled = ?, selected_model = ?
-        WHERE id = ?
-    """, (
-        config.get("soul_content", ""),
-        config.get("agents_content", ""),
-        config.get("user_content", ""),
-        json.dumps(config.get("tools_enabled", [])),
-        config.get("selected_model", ""),
-        bp_id,
-    ))
-    conn.commit()
+
+    # Build dynamic UPDATE: only set fields that are present (not None)
+    set_clauses = []
+    params = []
+    if "soul_content" in config:
+        set_clauses.append("soul_content = ?")
+        params.append(config["soul_content"])
+    if "agents_content" in config:
+        set_clauses.append("agents_content = ?")
+        params.append(config["agents_content"])
+    if "user_content" in config:
+        set_clauses.append("user_content = ?")
+        params.append(config["user_content"])
+    if "tools_enabled" in config:
+        set_clauses.append("tools_enabled = ?")
+        params.append(json.dumps(config["tools_enabled"]))
+    if "selected_model" in config:
+        set_clauses.append("selected_model = ?")
+        params.append(config["selected_model"])
+
+    if set_clauses:
+        params.append(bp_id)
+        cur.execute(f"UPDATE blueprints SET {', '.join(set_clauses)} WHERE id = ?", params)
+        conn.commit()
     conn.close()
 
 

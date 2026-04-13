@@ -1,4 +1,5 @@
 # apps/ops/tools_registry.py
+import sqlite3
 from apps.ops.db import get_db
 
 def list_tools():
@@ -16,10 +17,14 @@ def create_tool(name: str, description: str) -> dict:
     cur = conn.cursor()
     tool_id = f"custom-{uuid.uuid4().hex[:8]}"
     created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    cur.execute(
-        "INSERT INTO tools (id, name, description, created_at) VALUES (?, ?, ?, ?)",
-        (tool_id, name, description, created_at),
-    )
+    try:
+        cur.execute(
+            "INSERT INTO tools (id, name, description, created_at) VALUES (?, ?, ?, ?)",
+            (tool_id, name, description, created_at),
+        )
+    except sqlite3.IntegrityError:
+        conn.close()
+        return None  # name already exists
     conn.commit()
     conn.close()
     return {"id": tool_id, "name": name, "description": description, "created_at": created_at}

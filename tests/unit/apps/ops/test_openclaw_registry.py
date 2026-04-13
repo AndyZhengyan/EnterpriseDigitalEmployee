@@ -29,14 +29,14 @@ def registry(tmp_openclaw):
 
 
 def test_register_agent_creates_directory_and_files(registry):
-    result = registry.register_agent(
+    success, agent_id = registry.register_agent(
         blueprint_id="av-test-001",
         alias="测试员",
         role="测试专员",
         department="测试部",
         soul={"description": "专业测试员", "communication_style": "简洁"},
     )
-    assert result is True
+    assert success is True
 
     agent_dir = registry.agents_dir / "av-test-001" / "agent"
     assert agent_dir.exists()
@@ -70,14 +70,14 @@ def test_register_agent_is_idempotent(registry):
         department="测试部",
         soul={"description": "v1", "communication_style": "简洁"},
     )
-    result = registry.register_agent(
+    success, agent_id = registry.register_agent(
         blueprint_id="av-test-001",
         alias="测试员",
         role="测试专员",
         department="测试部",
         soul={"description": "v2", "communication_style": "简洁"},
     )
-    assert result is True
+    assert success is True
     soul_content = (registry.agents_dir / "av-test-001" / "agent" / "SOUL.md").read_text()
     assert "v2" in soul_content
 

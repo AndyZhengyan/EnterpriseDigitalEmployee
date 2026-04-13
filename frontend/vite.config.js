@@ -11,5 +11,6 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    maxHttpBufferSize: 50 * 1024 * 1024, // 50MB — allow large agent payloads
   },
 })
