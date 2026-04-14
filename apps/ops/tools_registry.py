@@ -1,6 +1,8 @@
 # apps/ops/tools_registry.py
 import sqlite3
+
 from apps.ops.db import get_db
+
 
 def list_tools():
     conn = get_db()
@@ -10,9 +12,11 @@ def list_tools():
     conn.close()
     return [{"id": r[0], "name": r[1], "description": r[2], "created_at": r[3]} for r in rows]
 
+
 def create_tool(name: str, description: str) -> dict:
     import uuid
     from datetime import datetime, timezone
+
     conn = get_db()
     cur = conn.cursor()
     tool_id = f"custom-{uuid.uuid4().hex[:8]}"
@@ -29,6 +33,7 @@ def create_tool(name: str, description: str) -> dict:
     conn.close()
     return {"id": tool_id, "name": name, "description": description, "created_at": created_at}
 
+
 def update_tool(tool_id: str, description: str) -> dict:
     conn = get_db()
     cur = conn.cursor()
@@ -40,6 +45,7 @@ def update_tool(tool_id: str, description: str) -> dict:
     if not row:
         return None
     return {"id": row[0], "name": row[1], "description": row[2], "created_at": row[3]}
+
 
 def delete_tool(tool_id: str) -> bool:
     conn = get_db()

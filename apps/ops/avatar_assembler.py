@@ -1,6 +1,5 @@
 # apps/ops/avatar_assembler.py
 # Assemble structured avatar config into OpenClaw .md files
-import json
 import os
 import shutil
 from datetime import datetime, timezone
@@ -9,6 +8,7 @@ from pathlib import Path
 OPENCLAW_DIR = Path(os.environ.get("OPENCLAW_DIR", str(Path.home() / ".openclaw")))
 AGENTS_DIR = OPENCLAW_DIR / "agents"
 
+
 def _backup_file(filepath: Path):
     """Create timestamped backup before writing."""
     if filepath.exists():
@@ -16,27 +16,30 @@ def _backup_file(filepath: Path):
         backup_path = filepath.parent / f"{filepath.name}.backup.{ts}"
         shutil.copy2(filepath, backup_path)
 
+
 def _ensure_agent_dir(agent_id: str) -> Path:
     agent_dir = AGENTS_DIR / agent_id / "agent"
     agent_dir.mkdir(parents=True, exist_ok=True)
     return agent_dir
 
+
 def assemble_identity(config: dict) -> str:
     """Assemble IDENTITY.md content."""
     return f"""# IDENTITY.md
 
-> {config.get('alias', '')}（{config.get('role', '')}）。{config.get('department', '')}。
+> {config.get("alias", "")}（{config.get("role", "")}）。{config.get("department", "")}。
 
 ---
 
 ## Core Identity [LOCKED]
 
-**Name:** {config.get('alias', '')}
-**Role:** {config.get('role', '')}
-**Department:** {config.get('department', '')}
-**Blueprint ID:** {config.get('id', '')}
+**Name:** {config.get("alias", "")}
+**Role:** {config.get("role", "")}
+**Department:** {config.get("department", "")}
+**Blueprint ID:** {config.get("id", "")}
 
 """
+
 
 def assemble_soul(config: dict) -> str:
     """Assemble SOUL.md content from soul_content field."""
@@ -46,17 +49,18 @@ def assemble_soul(config: dict) -> str:
     # Default minimal SOUL from identity
     return f"""# SOUL.md — Who I Am
 
-> {config.get('alias', '')}（{config.get('role', '')}）。
+> {config.get("alias", "")}（{config.get("role", "")}）。
 
 ---
 
 ## Core Identity [LOCKED]
 
-**Name:** {config.get('alias', '')}
-**Role:** {config.get('role', '')}
-**Department:** {config.get('department', '')}
+**Name:** {config.get("alias", "")}
+**Role:** {config.get("role", "")}
+**Department:** {config.get("department", "")}
 
 """
+
 
 def assemble_agents(config: dict) -> str:
     """Assemble AGENTS.md from agents_content or use minimal default."""
@@ -75,12 +79,13 @@ def assemble_agents(config: dict) -> str:
 
 """
 
+
 def assemble_user(config: dict) -> str:
     """Assemble USER.md from user_content."""
     content = config.get("user_content", "")
     if content:
         return content
-    return f"""# USER.md
+    return """# USER.md
 
 **称呼:** 用户
 **时区:** Asia/Shanghai
@@ -92,6 +97,7 @@ def assemble_user(config: dict) -> str:
 
 """
 
+
 def assemble_tools(config: dict) -> str:
     """Assemble TOOLS.md with enabled tools list."""
     tools = config.get("tools_enabled", [])
@@ -102,11 +108,14 @@ def assemble_tools(config: dict) -> str:
         lines.append(f"- **{tool}**")
     return "\n".join(lines) + "\n"
 
+
 def write_avatar_files(config: dict):
     """Write all OpenClaw .md files for an avatar."""
     # Use blueprint id (id) as primary path key — deploy creates dirs at this path.
     # openclaw_agent_id may differ (e.g. av---... vs av-中文-...) so prefer id.
     agent_id = config.get("id") or config.get("openclaw_agent_id")
+    if not agent_id:
+        raise ValueError("config must contain 'id' or 'openclaw_agent_id'")
     agent_dir = _ensure_agent_dir(agent_id)
 
     files = {
@@ -122,9 +131,11 @@ def write_avatar_files(config: dict):
         _backup_file(filepath)
         filepath.write_text(content, encoding="utf-8")
 
+
 def get_assembled_config(agent_id: str) -> dict:
     """Read current .md files and return as structured dict."""
     agent_dir = AGENTS_DIR / agent_id / "agent"
+
     def read_md(name):
         p = agent_dir / name
         return p.read_text(encoding="utf-8") if p.exists() else ""

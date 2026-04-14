@@ -19,6 +19,7 @@ from apps.runtime.models import PlanStep, TaskResult
 from apps.runtime.piagent_sidecar_client import PiAgentSidecarClient
 from apps.skill_hub.client import SkillHubClient
 from common.config import settings
+from common.service_registry import get_hub_url
 from common.tracing import get_logger
 
 from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
@@ -130,23 +131,23 @@ class RuntimeExecutor:
 
     @property
     def model_hub_client(self) -> ModelHubClient:
-        """Lazy ModelHub singleton for unified model invocation (port 8002)."""
-        return ModelHubClient.get_instance(base_url="http://127.0.0.1:8002", timeout=self.timeout_seconds)
+        """Lazy ModelHub singleton. URL comes from service registry (MODEL_HUB_URL env var wins)."""
+        return ModelHubClient.get_instance(base_url=get_hub_url("model_hub"), timeout=self.timeout_seconds)
 
     @property
     def skill_hub_client(self) -> SkillHubClient:
-        """Lazy SkillHub singleton for skill invocation (port 8004)."""
-        return SkillHubClient.get_instance(base_url="http://127.0.0.1:8004", timeout=self.timeout_seconds)
+        """Lazy SkillHub singleton. URL comes from service registry (SKILL_HUB_URL env var wins)."""
+        return SkillHubClient.get_instance(base_url=get_hub_url("skill_hub"), timeout=self.timeout_seconds)
 
     @property
     def connector_hub_client(self) -> ConnectorHubClient:
-        """Lazy ConnectorHub singleton for connector invocation (port 8003)."""
-        return ConnectorHubClient.get_instance(base_url="http://127.0.0.1:8003", timeout=self.timeout_seconds)
+        """Lazy ConnectorHub singleton. URL comes from service registry (CONNECTOR_HUB_URL env var wins)."""
+        return ConnectorHubClient.get_instance(base_url=get_hub_url("connector_hub"), timeout=self.timeout_seconds)
 
     @property
     def knowledge_hub_client(self) -> KnowledgeHubClient:
-        """Lazy KnowledgeHub singleton for RAG context enrichment (port 8005)."""
-        return KnowledgeHubClient.get_instance(base_url="http://127.0.0.1:8005", timeout=self.timeout_seconds)
+        """Lazy KnowledgeHub singleton. URL comes from service registry (KNOWLEDGE_HUB_URL env var wins)."""
+        return KnowledgeHubClient.get_instance(base_url=get_hub_url("knowledge_hub"), timeout=self.timeout_seconds)
 
     def start(self) -> None:
         """开始执行"""

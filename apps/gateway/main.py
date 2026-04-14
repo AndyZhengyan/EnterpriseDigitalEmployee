@@ -18,6 +18,7 @@ from slowapi.util import get_remote_address
 
 from common.errors import EAgentError, ErrorCode
 from common.models import BaseResponse, ErrorDetail, Priority, TaskStatus, TaskType
+from common.service_registry import get_hub_url
 from common.tracing import configure_logging, get_logger, new_trace_id
 
 # 配置日志
@@ -108,7 +109,8 @@ class CallbackRequest(BaseModel):
 # ============== 辅助函数 ==============
 
 
-RUNTIME_URL = os.environ.get("RUNTIME_URL", "http://localhost:8001")
+# Backward-compat: RUNTIME_URL env var still wins; otherwise use service registry.
+RUNTIME_URL = os.environ.get("RUNTIME_URL") or get_hub_url("runtime")
 
 
 async def _dispatch_to_runtime(req: DispatchRequest, trace_id: str) -> DispatchResponse:

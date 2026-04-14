@@ -53,11 +53,26 @@ class PiAgentSidecarConfig(BaseSettings):
 
 
 class RuntimeSettings(BaseSettings):
-    """Runtime 模块全局配置"""
+    """Runtime 模块全局配置
+
+    Hub URL 字段 are declared here so they can be overridden via env vars
+    (e.g. ``RUNTIME_MODEL_HUB_URL``) and picked up by the service registry.
+    The service registry (``common/service_registry.py``) is the authoritative
+    source for hub URLs at runtime; these fields serve as documentation and
+    a secondary override layer.
+    """
 
     max_concurrent_tasks: int = 100
     task_timeout_seconds: int = 30
     step_timeout_seconds: int = 10
+
+    # Hub URLs — resolved by common/service_registry.py
+    # Override via env vars: RUNTIME_MODEL_HUB_URL, RUNTIME_SKILL_HUB_URL, etc.
+    model_hub_url: Optional[str] = None
+    skill_hub_url: Optional[str] = None
+    connector_hub_url: Optional[str] = None
+    knowledge_hub_url: Optional[str] = None
+    runtime_url: Optional[str] = None
 
     # 子模块配置
     openclaw: OpenClawSettings = OpenClawSettings()

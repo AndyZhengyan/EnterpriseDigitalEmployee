@@ -467,6 +467,7 @@ OPENCLAW_BUILTIN_TOOLS = [
     ("session_status", "会话状态查询"),
 ]
 
+
 def seed_tools():
     """Seed OpenClaw built-in tools if tools table is empty."""
     conn = get_db()
@@ -500,13 +501,20 @@ def get_blueprint_config(bp_id: str):
     if not row:
         return None
     import json
+
     return {
-        "id": row[0], "role": row[1], "alias": row[2], "department": row[3],
+        "id": row[0],
+        "role": row[1],
+        "alias": row[2],
+        "department": row[3],
         "openclaw_agent_id": row[4] or row[0],
-        "soul_content": row[5] or "", "agents_content": row[6] or "",
-        "user_content": row[7] or "", "tools_enabled": json.loads(row[8] or "[]"),
+        "soul_content": row[5] or "",
+        "agents_content": row[6] or "",
+        "user_content": row[7] or "",
+        "tools_enabled": json.loads(row[8] or "[]"),
         "selected_model": row[9] or "",
     }
+
 
 def save_blueprint_config(bp_id: str, config: dict):
     """Save avatar config fields for a blueprint.
@@ -515,6 +523,7 @@ def save_blueprint_config(bp_id: str, config: dict):
     This allows partial updates (only changed fields) without overwriting others.
     """
     import json
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -691,7 +700,8 @@ def get_recent_executions(limit: int = 10):
     cur.execute(
         """
         SELECT t.id, t.blueprint_id, b.alias, b.role, b.department, t.message, t.status,
-               t.token_input, t.token_analysis, t.token_completion, t.duration_ms, t.summary, t.response_text, t.created_at
+               t.token_input, t.token_analysis, t.token_completion, t.duration_ms,
+               t.summary, t.response_text, t.created_at
         FROM task_executions t
         LEFT JOIN blueprints b ON t.blueprint_id = b.id
         ORDER BY t.created_at DESC LIMIT ?
@@ -719,3 +729,111 @@ def get_recent_executions(limit: int = 10):
     ]
     conn.close()
     return rows
+
+
+# ── Dashboard helper functions ────────────────────────────────────────────────
+
+
+def get_status_dist() -> list[dict]:
+    """Return status distribution rows for dashboard."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT status, label, count, color FROM status_dist")
+    rows = [{"status": r[0], "label": r[1], "count": r[2], "color": r[3]} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_capability_dist() -> list[dict]:
+    """Return capability distribution rows for dashboard."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT role, alias, dept, pct FROM capability_dist ORDER BY pct DESC")
+    rows = [{"role": r[0], "alias": r[1], "dept": r[2], "pct": r[3]} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_task_detail() -> dict:
+    """Return task detail dates/success/failed arrays."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT dates, success, failed FROM task_detail LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return {"dates": [], "success": [], "failed": []}
+    return {
+        "dates": json.loads(row[0]),
+        "success": json.loads(row[1]),
+        "failed": json.loads(row[2]),
+    }
+
+
+def get_task_trend() -> list[dict]:
+    """Return task trend as [{date, value}] for the TaskTrend chart component."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT dates, success, failed FROM task_detail LIMIT 1")
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return []
+    dates = json.loads(row[0])
+    success = json.loads(row[1])
+    return [{"date": d, "value": s} for d, s in zip(dates, success)]
+
+
+def get_token_daily() -> list[dict]:
+    """Return token daily trend rows."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT date, value FROM token_daily ORDER BY date")
+    rows = [{"date": r[0], "value": r[1]} for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def get_activity_feed(limit: int = 10) -> list[dict]:
+    """Blend real executions with seed activity_log, sorted by timestamp descending."""
+    executions = get_recent_executions(limit=limit)
+
+    activity_items = []
+    for ex in executions:
+        activity_items.append(
+            {
+                "id": ex["id"],
+                "type": "task_completed" if ex["status"] == "ok" else "task_failed",
+                "alias": ex["alias"],
+                "role": ex["role"],
+                "dept": ex["dept"],
+                "content": ex["summary"] or ex["message"][:60],
+                "timestamp": ex["created_at"],
+            }
+        )
+
+    if len(activity_items) < limit:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, type, employee_id, alias, role, dept, content, timestamp "
+            "FROM activity_log ORDER BY timestamp DESC LIMIT ?",
+            (limit - len(activity_items),),
+        )
+        for r in cur.fetchall():
+            activity_items.append(
+                {
+                    "id": r[0],
+                    "type": r[1],
+                    "alias": r[3],
+                    "role": r[4],
+                    "dept": r[5],
+                    "content": r[6],
+                    "timestamp": r[7],
+                }
+            )
+        conn.close()
+
+    # Sort by timestamp descending, take top `limit`
+    activity_items.sort(key=lambda x: x["timestamp"], reverse=True)
+    return activity_items[:limit]

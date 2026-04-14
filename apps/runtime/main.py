@@ -28,6 +28,7 @@ from apps.runtime.models import (
     TaskResult,
     TaskStatus,
 )
+from apps.runtime.task_store import TaskStore
 from common.errors import ErrorCode
 from common.models import BaseResponse, ErrorDetail
 from common.tracing import get_logger, new_trace_id
@@ -36,7 +37,6 @@ from common.tracing import get_logger, new_trace_id
 
 memory_manager = MemoryManager()
 executors: Dict[str, RuntimeExecutor] = {}
-_task_store: Dict[str, Dict[str, Any]] = {}
 
 RUNTIME_VERSION = "0.1.0"
 RUNTIME_TIMEOUT = int(os.environ.get("RUNTIME_TIMEOUT", "300"))
@@ -50,34 +50,22 @@ def _get_or_create_executor(employee_id: str, task_id: str) -> RuntimeExecutor:
 
 
 def _store_task(task_id: str, status: str, employee_id: str, **kwargs) -> None:
-    _task_store[task_id] = {
-        "task_id": task_id,
-        "status": status,
-        "employee_id": employee_id,
-        "created_at": datetime.now(timezone.utc),
-        "started_at": None,
-        "completed_at": None,
-        "steps": [],
-        "current_step": 0,
-        "total_steps": 0,
-        "trace_id": new_trace_id(),
-        **kwargs,
-    }
+    TaskStore.create_task(task_id, status, employee_id, **kwargs)
 
 
 def _update_task(task_id: str, **updates) -> None:
-    if task_id in _task_store:
-        _task_store[task_id].update(updates)
+    TaskStore.update_task(task_id, **updates)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log = get_logger("runtime")
     log.info("runtime_startup", version=RUNTIME_VERSION)
+    TaskStore.init()
     yield
     log.info("runtime_shutdown")
     executors.clear()
-    _task_store.clear()
+    TaskStore.clear()
 
 
 app = FastAPI(
@@ -115,8 +103,8 @@ async def health_check() -> HealthResponse:
         timestamp=datetime.now(timezone.utc),
         checks={"memory": "ok", "piagent": "ok"},
         stats={
-            "active_tasks": sum(1 for t in _task_store.values() if t["status"] == "running"),
-            "total_tasks": len(_task_store),
+            "active_tasks": TaskStore.active_count(),
+            "total_tasks": TaskStore.total_count(),
             "executor_count": len(executors),
         },
     )
@@ -126,7 +114,8 @@ async def _execute_task(task_id: str, query: str, skill_names: list[str], employ
     """Background helper that runs the actual agent execution."""
     import asyncio
 
-    trace_id = _task_store.get(task_id, {}).get("trace_id", new_trace_id())
+    stored = TaskStore.get_task(task_id)
+    trace_id = stored.get("trace_id", new_trace_id()) if stored else new_trace_id()
     log = get_logger("runtime")
     _update_task(task_id, status="running", started_at=datetime.now(timezone.utc))
 
@@ -230,9 +219,9 @@ async def generate_plan(req: PlanRequest, request: Request) -> PlanResponse:
 
 @app.get("/runtime/status/{task_id}", response_model=StatusResponse, tags=["状态"])
 async def get_status(task_id: str, request: Request) -> StatusResponse:
-    if task_id not in _task_store:
+    task = TaskStore.get_task(task_id)
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    task = _task_store[task_id]
 
     current_step = task.get("current_step", 0)
     total_steps = task.get("total_steps", 0)
@@ -257,9 +246,9 @@ async def get_status(task_id: str, request: Request) -> StatusResponse:
 
 @app.post("/runtime/cancel/{task_id}", response_model=CancelResponse, tags=["取消"])
 async def cancel_task(task_id: str, request: Request) -> CancelResponse:
-    if task_id not in _task_store:
+    task = TaskStore.get_task(task_id)
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    task = _task_store[task_id]
     if task["status"] in ("completed", "failed", "cancelled"):
         raise HTTPException(status_code=400, detail=f"Cannot cancel task in status: {task['status']}")
     _update_task(task_id, status="cancelled", completed_at=datetime.now(timezone.utc))

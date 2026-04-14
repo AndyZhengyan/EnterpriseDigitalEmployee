@@ -26,15 +26,25 @@ uv sync
 pytest tests/ -v
 ```
 
-### 启动开发服务
+### 运行各层服务
+
+你可以分别启动网关、运行时、运营中心以及前端，或使用快捷方式。
 
 ```bash
-# Gateway 服务
-cd apps/gateway && uvicorn main:app --reload --port 8000
+# 1. 运营中心 (Dashboard/Onboarding API)
+python -m apps.ops.main
 
-# 或使用快捷脚本
-./scripts/dev.sh
+# 2. 网关 (API Gateway)
+python -m apps.gateway.main
+
+# 3. 运行时 (Agent Execute Cycle)
+python -m apps.runtime.main
+
+# 4. 前端 (Vue3 Dashboard)
+cd frontend && npm run dev
 ```
+
+> **注意**：本地开发默认使用 Redis 和 SQLite，请确保环境已安装 `redis` 并正在运行。
 
 ## 文档导航
 

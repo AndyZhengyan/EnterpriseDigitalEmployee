@@ -272,10 +272,10 @@ class TestExecuteTask:
                 after_count = len(get_executor_executions(get_cursor))
                 assert after_count > before_count
 
-                # Activity feed should include the new execution
+                # Activity feed should include the new execution (check returned alias)
                 activity = client.get("/api/dashboard/activity").json()
                 aliases = [a["alias"] for a in activity]
-                assert "QA" in aliases
+                assert data["alias"] in aliases
 
     def test_execute_updates_stats(self, client, get_cursor):
         """Successful execution increments monthlyTasks and totalTokenUsage."""

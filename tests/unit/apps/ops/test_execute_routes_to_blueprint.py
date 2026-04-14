@@ -20,11 +20,11 @@ def _init_test_db(tmp_path, monkeypatch):
     conn.close()
 
     # Initialize key manager so endpoints don't raise "Key manager not initialized"
-    from apps.ops import main as ops_main
+    from apps.ops._auth import _force_dev_mode, _init_key_manager
 
-    ops_main._init_key_manager(str(tmp_path / "ops.db"))
+    _init_key_manager(str(tmp_path / "ops.db"))
     # Force dev mode so tests don't need API keys
-    ops_main._force_dev_mode()
+    _force_dev_mode()
 
 
 def test_execute_uses_blueprint_id_param(tmp_path, monkeypatch):
@@ -35,7 +35,7 @@ def test_execute_uses_blueprint_id_param(tmp_path, monkeypatch):
 
     client = TestClient(app)
 
-    with patch("apps.ops.main._run_piagent") as mock_run:
+    with patch("apps.ops.routers.execute._run_piagent") as mock_run:
         mock_run.return_value = {
             "status": "ok",
             "runId": "stub-abc12345",
@@ -71,7 +71,7 @@ def test_execute_defaults_to_av_swe_when_no_blueprint_id(tmp_path, monkeypatch):
 
     client = TestClient(app)
 
-    with patch("apps.ops.main._run_piagent") as mock_run:
+    with patch("apps.ops.routers.execute._run_piagent") as mock_run:
         mock_run.return_value = {
             "status": "ok",
             "runId": "stub-abc12345",
