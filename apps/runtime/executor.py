@@ -365,7 +365,7 @@ class RuntimeExecutor:
         max_retries = retries if retries is not None else self.retry_config["max_retries"]
         delay_ms = self.retry_config["initial_delay_ms"]
 
-        last_error: Optional[Exception] = None
+        last_error: Optional[Exception] = Exception("All retries exhausted in execute_step")
         for attempt in range(max_retries + 1):
             try:
                 # 构建调用 prompt
@@ -452,7 +452,7 @@ class RuntimeExecutor:
                 continue
 
         # 所有重试都失败
-        raise last_error or Exception("Unknown error in execute_step")
+        raise last_error
 
     async def reflect(
         self,
