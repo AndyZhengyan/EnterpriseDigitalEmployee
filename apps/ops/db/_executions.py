@@ -82,7 +82,10 @@ def _recalc_stats(conn) -> None:
         )
         daily_counts.append(cur.fetchone()[0] or 0)
 
-    prev, curr = daily_counts[-2], daily_counts[-1]
+    if len(daily_counts) < 2:
+        prev = curr = 0
+    else:
+        prev, curr = daily_counts[-2], daily_counts[-1]
     task_trend_change = round((curr - prev) / max(prev, 1) * 100, 1)
     success_rate = round(success_count / max(total_tasks, 1) * 100, 1)
     token_efficiency = round(total_tasks / max(total_tokens / 1_000_000, 1), 2)
