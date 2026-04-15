@@ -57,9 +57,6 @@ _CAP_ITEMS = [
     ("客服专员", "小红", "客服部", 3),
 ]
 
-# Dashboard baseline values (mirrored in _seed_data.DASHBOARD_STATS_BASELINE)
-_DASH_STATS = (10, 19_480_000, 4513, 68, 94.2, 3.2, -8.7, 2.1)
-
 _ACTIVITIES = [
     (
         "act-001",
@@ -93,7 +90,20 @@ def seed_all():
         conn.close()
         return
 
-    # Dashboard stats
+    # Dashboard stats — values derived from _seed_data.DASHBOARD_STATS_BASELINE
+    from .._seed_data import DASHBOARD_STATS_BASELINE
+
+    b = DASHBOARD_STATS_BASELINE
+    dash_stats = (
+        10,                                   # online_count
+        b["total_token_usage"],               # 19_480_000
+        b["total_tasks"],                     # 4513
+        68,                                   # system_load
+        94.2,                                 # task_success_rate
+        3.2,                                  # token_efficiency
+        -8.7,                                 # task_trend_change
+        2.1,                                  # success_rate_change
+    )
     cur.execute(
         """
         INSERT INTO dashboard_stats
@@ -101,7 +111,7 @@ def seed_all():
              task_success_rate, token_efficiency, task_trend_change, success_rate_change)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        _DASH_STATS,
+        dash_stats,
     )
 
     # Status distribution
