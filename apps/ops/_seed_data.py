@@ -1,8 +1,9 @@
 """Seed data — single source of truth for all initial dataset.
 
 Imported by:
-  - ops/main.py  (SEED_VERSIONS, SEED_CAPACITY for reset_seed_blueprints)
-  - ops/db.py    (blueprints_data for seed_data())
+  - ops/main.py           (SEED_VERSIONS, SEED_CAPACITY for reset_seed_blueprints)
+  - ops/db/_seed.py       (get_blueprints_data() in seed_all())
+  - ops/db/_executions.py (DASHBOARD_STATS_BASELINE in _recalc_stats())
 
 Both consumers must import from here; do not duplicate data elsewhere.
 """
