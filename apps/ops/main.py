@@ -2,7 +2,6 @@
 import json
 import os
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +15,7 @@ from ._auth import (
     verify_api_key,
 )
 from ._piagent import _run_piagent
+from ._seed_data import SEED_CAPACITY, SEED_VERSIONS
 from .db import init_db
 
 # Re-export for backward compatibility (tests and other modules import from here)
@@ -90,106 +90,6 @@ def _mount_routers():
 
 
 _mount_routers()
-
-
-# ── Seed data ─────────────────────────────────────────────────────────────────
-
-
-SEED_VERSIONS: dict[str, list[dict[str, Any]]] = {
-    "av-admin-001": [
-        {
-            "version": "v1.0.0",
-            "status": "published",
-            "traffic": 60,
-            "replicas": 3,
-            "config": {
-                "soul": {"mbti": "ISFJ", "style": "简洁汇报", "priority": "效率优先"},
-                "skills": ["飞书通知", "文档处理"],
-                "tools": ["飞书API", "文档处理器"],
-                "model": "claude-sonnet-4-7",
-            },
-            "scaling": {"min_replicas": 1, "max_replicas": 5, "target_load": 60},
-        },
-        {
-            "version": "v1.0.1",
-            "status": "published",
-            "traffic": 40,
-            "replicas": 2,
-            "config": {
-                "soul": {"mbti": "ISFJ", "style": "简洁汇报", "priority": "效率优先"},
-                "skills": ["飞书通知", "文档处理", "数据录入"],
-                "tools": ["飞书API", "文档处理器", "数据库连接器"],
-                "model": "claude-sonnet-4-7",
-            },
-            "scaling": {"min_replicas": 1, "max_replicas": 5, "target_load": 60},
-        },
-        {
-            "version": "v1.1.0-beta",
-            "status": "testing",
-            "traffic": 0,
-            "replicas": 1,
-            "config": {
-                "soul": {"mbti": "INTJ", "style": "详细说明", "priority": "合规优先"},
-                "skills": ["飞书通知", "文档处理", "数据分析", "合规检查"],
-                "tools": ["飞书API", "文档处理器", "数据分析引擎"],
-                "model": "claude-opus-4-7",
-            },
-            "scaling": {"min_replicas": 1, "max_replicas": 3, "target_load": 70},
-        },
-    ],
-    "av-legal-001": [
-        {
-            "version": "v1.0.0",
-            "status": "published",
-            "traffic": 100,
-            "replicas": 1,
-            "config": {
-                "soul": {"mbti": "INTJ", "style": "详细说明", "priority": "合规优先"},
-                "skills": ["合同审核", "法规检索", "合规检查"],
-                "tools": ["飞书API", "知识库检索", "合规引擎"],
-                "model": "claude-opus-4-7",
-            },
-            "scaling": {"min_replicas": 1, "max_replicas": 3, "target_load": 60},
-        },
-    ],
-    "av-contract-001": [
-        {
-            "version": "v1.0.0",
-            "status": "published",
-            "traffic": 100,
-            "replicas": 2,
-            "config": {
-                "soul": {"mbti": "ESTJ", "style": "简洁汇报", "priority": "合规优先"},
-                "skills": ["合同起草", "版本管理", "文档归档"],
-                "tools": ["飞书API", "文档处理器", "版本追踪器"],
-                "model": "claude-sonnet-4-7",
-            },
-            "scaling": {"min_replicas": 1, "max_replicas": 5, "target_load": 65},
-        },
-    ],
-    "av-swe-001": [
-        {
-            "version": "v1.0.0",
-            "status": "published",
-            "traffic": 100,
-            "replicas": 5,
-            "config": {
-                "soul": {"mbti": "INTP", "style": "详细说明", "priority": "效率优先"},
-                "skills": ["代码开发", "代码审查", "技术写作"],
-                "tools": ["git CLI", "GitHub MCP", "代码分析器"],
-                "model": "claude-sonnet-4-7",
-            },
-            "scaling": {"min_replicas": 2, "max_replicas": 10, "target_load": 60},
-        },
-    ],
-}
-
-SEED_CAPACITY = {
-    "av-admin-001": {"used": 6, "max": 10},
-    "av-legal-001": {"used": 1, "max": 5},
-    "av-contract-001": {"used": 2, "max": 5},
-    "av-swe-001": {"used": 5, "max": 10},
-}
 
 
 @app.post("/api/test/reset-seeds", tags=["test"])

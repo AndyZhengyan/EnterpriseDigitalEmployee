@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import enum
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -25,6 +26,17 @@ from common.tracing import get_logger
 from .piagent_client import PiAgentClient, PiAgentError, PiAgentTimeoutError
 
 logger = get_logger("runtime.executor")
+
+
+@dataclass
+class _AgentResult:
+    """Unified result from the three possible execution backends."""
+
+    text: str
+    latency_ms: int
+    raw: Any = None
+    run_id: str = ""
+
 
 # ============== Prompt injection mitigation ==============
 
@@ -203,6 +215,42 @@ class RuntimeExecutor:
             return self.AGENT_FOR_COMPLEX
         return self.AGENT_FOR_SIMPLE
 
+    async def _execute_via(self, prompt: str, task_type: str = "default") -> _AgentResult:
+        """Send a prompt via the configured backend (model_hub → sidecar → piagent).
+
+        This collapses the three identical if/elif/else branches that previously
+        appeared in generate_plan, execute_step, and reflect.
+        """
+        if self._use_model_hub:
+            messages = [{"role": "user", "content": prompt}]
+            resp = await self.model_hub_client.chat(
+                messages=messages,
+                task_type=task_type,
+                session_id=self.task_id,
+                employee_id=self.employee_id,
+                timeout_seconds=self.timeout_seconds,
+            )
+            return _AgentResult(text=resp.content, latency_ms=resp.latency_ms, raw=resp.raw)
+
+        if self._use_sidecar:
+            result = await asyncio.wait_for(
+                self.sidecar_client.invoke(prompt),
+                timeout=self.timeout_seconds,
+            )
+            return _AgentResult(text=result.answer, latency_ms=result.duration_ms)
+
+        loop = asyncio.get_event_loop()
+        pi_result = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
+            timeout=self.timeout_seconds,
+        )
+        return _AgentResult(
+            text=pi_result.text or "",
+            latency_ms=pi_result.duration_ms,
+            raw=pi_result.raw,
+            run_id=pi_result.run_id,
+        )
+
     async def generate_plan(
         self,
         task: str,
@@ -255,37 +303,17 @@ class RuntimeExecutor:
         )
 
         try:
-            if self._use_model_hub:
-                messages = [{"role": "user", "content": prompt}]
-                resp = await self.model_hub_client.chat(
-                    messages=messages,
-                    task_type="planning",
-                    session_id=self.task_id,
-                    employee_id=self.employee_id,
-                    timeout_seconds=self.timeout_seconds,
-                )
-                plan_text = resp.content
-            elif self._use_sidecar:
-                sidecar_result = await asyncio.wait_for(
-                    self.sidecar_client.invoke(prompt),
-                    timeout=self.timeout_seconds,
-                )
-                plan_text = sidecar_result.answer
-            else:
-                loop = asyncio.get_event_loop()
-                piagent_result = await asyncio.wait_for(
-                    loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-                    timeout=self.timeout_seconds,
-                )
-                plan_text = piagent_result.text or ""
+            result = await self._execute_via(prompt, task_type="planning")
         except asyncio.TimeoutError:
             raise PiAgentError(
                 f"Plan generation timed out after {self.timeout_seconds}s",
                 agent_id=self.agent_id,
             )
 
-        if not plan_text:
+        if not result.text:
             raise PiAgentError("Empty response from PiAgent during plan generation", agent_id=self.agent_id)
+
+        plan_text = result.text
 
         # 解析 JSON 计划
         return self._parse_plan(plan_text)
@@ -337,7 +365,7 @@ class RuntimeExecutor:
         max_retries = retries if retries is not None else self.retry_config["max_retries"]
         delay_ms = self.retry_config["initial_delay_ms"]
 
-        last_error: Optional[Exception] = None
+        last_error: Optional[BaseException] = None
         for attempt in range(max_retries + 1):
             try:
                 # 构建调用 prompt
@@ -391,44 +419,13 @@ class RuntimeExecutor:
                 else:
                     prompt = f"执行步骤：{step.type}\n输入：{json_module.dumps(step.input, ensure_ascii=False)}"
 
-                if self._use_model_hub:
-                    messages = [{"role": "user", "content": prompt}]
-                    resp = await self.model_hub_client.chat(
-                        messages=messages,
-                        task_type="code",
-                        session_id=self.task_id,
-                        employee_id=self.employee_id,
-                        timeout_seconds=self.timeout_seconds,
-                    )
-                    return {
-                        "status": "success",
-                        "output": {"text": resp.content, "raw": resp.raw},
-                        "duration_ms": resp.latency_ms,
-                        "run_id": "",
-                    }
-                elif self._use_sidecar:
-                    sidecar_result = await asyncio.wait_for(
-                        self.sidecar_client.invoke(prompt),
-                        timeout=self.timeout_seconds,
-                    )
-                    return {
-                        "status": "success",
-                        "output": {"text": sidecar_result.answer, "raw": None},
-                        "duration_ms": sidecar_result.duration_ms,
-                        "run_id": "",
-                    }
-                else:
-                    loop = asyncio.get_event_loop()
-                    pi_result = await asyncio.wait_for(
-                        loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-                        timeout=self.timeout_seconds,
-                    )
-                    return {
-                        "status": "success",
-                        "output": {"text": pi_result.text, "raw": pi_result.raw},
-                        "duration_ms": pi_result.duration_ms,
-                        "run_id": pi_result.run_id,
-                    }
+                result = await self._execute_via(prompt, task_type="code")
+                return {
+                    "status": "success",
+                    "output": {"text": result.text, "raw": result.raw},
+                    "duration_ms": result.latency_ms,
+                    "run_id": result.run_id,
+                }
 
             except asyncio.TimeoutError:
                 last_error = PiAgentTimeoutError(
@@ -455,7 +452,8 @@ class RuntimeExecutor:
                 continue
 
         # 所有重试都失败
-        raise last_error or Exception("Unknown error in execute_step")
+        assert last_error is not None
+        raise last_error
 
     async def reflect(
         self,
@@ -487,29 +485,8 @@ class RuntimeExecutor:
         )
 
         try:
-            if self._use_model_hub:
-                messages = [{"role": "user", "content": prompt}]
-                resp = await self.model_hub_client.chat(
-                    messages=messages,
-                    task_type="fast",
-                    session_id=self.task_id,
-                    employee_id=self.employee_id,
-                    timeout_seconds=self.timeout_seconds,
-                )
-                reflect_text = resp.content
-            elif self._use_sidecar:
-                sidecar_result = await asyncio.wait_for(
-                    self.sidecar_client.invoke(prompt),
-                    timeout=self.timeout_seconds,
-                )
-                reflect_text = sidecar_result.answer
-            else:
-                loop = asyncio.get_event_loop()
-                pi_result = await asyncio.wait_for(
-                    loop.run_in_executor(None, lambda: self.piagent.invoke(prompt)),
-                    timeout=self.timeout_seconds,
-                )
-                reflect_text = pi_result.text or ""
+            result = await self._execute_via(prompt, task_type="fast")
+            reflect_text = result.text
         except asyncio.TimeoutError:
             logger.warning("reflect_timeout", timeout_s=self.timeout_seconds)
             return {"continue": remaining > 0, "reason": "Reflection timed out", "assessment": "Timeout"}
